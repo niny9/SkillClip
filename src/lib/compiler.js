@@ -1,4 +1,5 @@
 import { createId, dedupe, nowIso, slugify, titleFromText } from "./utils.js";
+import { validateSkillAsset } from "./validator.js";
 
 function extractVariablesFromText(text) {
   const matches = text.match(/\{[a-zA-Z0-9_]+\}|\[[^\]]+\]|"[^"]+"|'[^']+'/g) || [];
@@ -58,19 +59,39 @@ function inferSteps(turns) {
   return steps;
 }
 
-export function compileSkillDraft(payload) {
+function inferUseWhen(scenario) {
+  return `Use this skill when you need help with ${scenario.toLowerCase()} and want a repeatable result.`;
+}
+
+function inferNotFor(scenario) {
+  return `Do not use this skill when the task is unrelated to ${scenario.toLowerCase()} or requires live external verification.`;
+}
+
+function inferSuccessCriteria(outputFormat) {
+  return [
+    "The output follows the requested structure.",
+    "The answer reflects the original user intent.",
+    `The result is usable as a ${outputFormat.toLowerCase()}.`
+  ];
+}
+
+export function compileSkillDraft(payload, settings = {}) {
   const selectedText = payload.selectedText || payload.turns?.[0]?.text || "";
   const name = titleFromText(selectedText, payload.title || "Untitled Skill Draft");
   const scenario = inferScenario(payload);
   const inputs = extractVariablesFromText(selectedText);
   const steps = inferSteps(payload.turns);
+  const outputFormat = "Structured response";
 
-  return {
+  const draft = {
     id: createId("draft"),
     kind: "skill_draft",
     status: "draft",
     name,
+    whatItDoes: `Turns a captured AI workflow into a reusable method for ${scenario.toLowerCase()}.`,
     scenario,
+    useWhen: inferUseWhen(scenario),
+    notFor: inferNotFor(scenario),
     goal: `Reuse a proven workflow from ${payload.platform || "an AI tool"}`,
     userIntent: titleFromText(selectedText, "Reuse this AI workflow"),
     inputs,
@@ -80,11 +101,17 @@ export function compileSkillDraft(payload) {
     ],
     steps,
     promptTemplate: buildPromptTemplate(selectedText, inputs),
-    outputFormat: "Structured response",
+    outputFormat,
+    successCriteria: inferSuccessCriteria(outputFormat),
     example: selectedText,
     sourceConversationIds: [payload.conversationId],
     createdAt: nowIso(),
     updatedAt: nowIso()
+  };
+
+  return {
+    ...draft,
+    validation: validateSkillAsset(draft, settings)
   };
 }
 
@@ -106,14 +133,17 @@ function buildPromptTemplate(selectedText, inputs) {
   return template;
 }
 
-export function promoteDraftToSkill(draft) {
-  return {
+export function promoteDraftToSkill(draft, settings = {}) {
+  const skill = {
     id: createId("skill"),
     kind: "skill",
     status: "validated",
     name: draft.name,
     slug: slugify(draft.name),
+    whatItDoes: draft.whatItDoes,
     scenario: draft.scenario,
+    useWhen: draft.useWhen,
+    notFor: draft.notFor,
     goal: draft.goal,
     userIntent: draft.userIntent,
     inputs: draft.inputs,
@@ -121,6 +151,7 @@ export function promoteDraftToSkill(draft) {
     steps: draft.steps,
     promptTemplate: draft.promptTemplate,
     outputFormat: draft.outputFormat,
+    successCriteria: draft.successCriteria,
     example: draft.example,
     tags: [],
     sourceConversationIds: draft.sourceConversationIds,
@@ -129,6 +160,11 @@ export function promoteDraftToSkill(draft) {
     usageCount: 0,
     createdAt: nowIso(),
     updatedAt: nowIso()
+  };
+
+  return {
+    ...skill,
+    validation: validateSkillAsset(skill, settings)
   };
 }
 

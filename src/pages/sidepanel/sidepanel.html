@@ -72,6 +72,16 @@
           </label>
 
           <label class="field-label">
+            <span>Use When / 适用场景</span>
+            <textarea name="useWhen" rows="3"></textarea>
+          </label>
+
+          <label class="field-label">
+            <span>Not For / 不适用</span>
+            <textarea name="notFor" rows="3"></textarea>
+          </label>
+
+          <label class="field-label">
             <span>Goal / 目标</span>
             <textarea name="goal" rows="3"></textarea>
           </label>
@@ -86,11 +96,26 @@
             <textarea name="steps" rows="6"></textarea>
           </label>
 
+          <label class="field-label">
+            <span>Output Format / 输出格式</span>
+            <input name="outputFormat" type="text" />
+          </label>
+
+          <label class="field-label">
+            <span>Success Criteria / 成功标准（每行一条）</span>
+            <textarea name="successCriteria" rows="5"></textarea>
+          </label>
+
           <div class="action-row">
             <button type="submit">Save Changes / 保存修改</button>
             <button type="button" data-action="clear-detail">Close / 关闭</button>
           </div>
         </form>
+
+        <section class="detail-validation-block" data-validation-panel hidden>
+          <h3>Validation / 合理性检查</h3>
+          <div data-validation-content class="stack"></div>
+        </section>
 
         <section class="detail-source-block" data-source-panel hidden>
           <h3>Source Preview / 来源预览</h3>

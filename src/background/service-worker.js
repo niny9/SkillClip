@@ -1,6 +1,7 @@
 import { compileSkillDraft, createVariantFromSkill, promoteDraftToSkill } from "../lib/compiler.js";
 import { MESSAGE_TYPES } from "../lib/constants.js";
 import { ensureContentScript } from "../lib/injection.js";
+import { validateSkillAsset } from "../lib/validator.js";
 import { createId, nowIso } from "../lib/utils.js";
 import {
   archiveConversation,
@@ -9,6 +10,7 @@ import {
   findDraftById,
   findSkillById,
   getAllState,
+  getSettings,
   insertConversation,
   insertDraft,
   insertSkill,
@@ -16,6 +18,7 @@ import {
   removeDraft,
   resetAllState,
   seedDemoSkillIfNeeded,
+  updateSettings,
   updateDraft,
   updateSkill
 } from "../lib/storage.js";
@@ -81,6 +84,8 @@ async function handleMessage(message, sender) {
       return updateDraftItem(message.payload);
     case MESSAGE_TYPES.UPDATE_SKILL:
       return updateSkillItem(message.payload);
+    case MESSAGE_TYPES.UPDATE_SETTINGS:
+      return updateSettingsItem(message.payload);
     case MESSAGE_TYPES.RESET_STATE:
       return resetState();
     case MESSAGE_TYPES.SEED_DEMO:
@@ -121,11 +126,12 @@ async function saveConversationMemory(payload, captureMode) {
 }
 
 async function compileConversationToDraft(payload) {
+  const settings = await getSettings();
   const memory = await saveConversationMemory(payload, "recent_turns");
   const draft = compileSkillDraft({
     ...payload,
     conversationId: memory.id
-  });
+  }, settings);
 
   await insertDraft(draft);
   await broadcastStorageUpdate();
@@ -139,7 +145,8 @@ async function promoteDraft(draftId) {
     throw new Error("Draft not found");
   }
 
-  const skill = promoteDraftToSkill(draft);
+  const settings = await getSettings();
+  const skill = promoteDraftToSkill(draft, settings);
   await insertSkill(skill);
   await removeDraft(draftId);
   await broadcastStorageUpdate();
@@ -187,13 +194,23 @@ async function archiveSkillItem(skillId) {
 }
 
 async function updateDraftItem(payload) {
+  const settings = await getSettings();
   const item = await updateDraft(payload.id, (draft) => ({
     ...draft,
     name: payload.name,
+    whatItDoes: payload.whatItDoes,
     scenario: payload.scenario,
+    useWhen: payload.useWhen,
+    notFor: payload.notFor,
     goal: payload.goal,
     promptTemplate: payload.promptTemplate,
+    outputFormat: payload.outputFormat,
+    successCriteria: payload.successCriteria,
     steps: payload.steps,
+    validation: validateSkillAsset({
+      ...draft,
+      ...payload
+    }, settings),
     updatedAt: nowIso()
   }));
   await broadcastStorageUpdate();
@@ -201,13 +218,23 @@ async function updateDraftItem(payload) {
 }
 
 async function updateSkillItem(payload) {
+  const settings = await getSettings();
   const item = await updateSkill(payload.id, (skill) => ({
     ...skill,
     name: payload.name,
+    whatItDoes: payload.whatItDoes,
     scenario: payload.scenario,
+    useWhen: payload.useWhen,
+    notFor: payload.notFor,
     goal: payload.goal,
     promptTemplate: payload.promptTemplate,
+    outputFormat: payload.outputFormat,
+    successCriteria: payload.successCriteria,
     steps: payload.steps,
+    validation: validateSkillAsset({
+      ...skill,
+      ...payload
+    }, settings),
     updatedAt: nowIso()
   }));
   await broadcastStorageUpdate();
@@ -225,6 +252,12 @@ async function seedDemo() {
   await seedDemoSkillIfNeeded();
   await broadcastStorageUpdate();
   return { ok: true };
+}
+
+async function updateSettingsItem(payload) {
+  const settings = await updateSettings(payload);
+  await broadcastStorageUpdate();
+  return settings;
 }
 
 async function ensureContentScriptForTab(tabId) {
