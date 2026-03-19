@@ -67,11 +67,16 @@ select {
 
 .page-shell-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.95fr);
+  grid-template-columns: 1fr;
   gap: 1rem;
-  width: auto;
-  max-width: 1320px;
-  padding: 1rem;
+  width: 100%;
+  max-width: 100%;
+  padding: 0.9rem;
+}
+
+.page-shell-workspace > section,
+.page-shell-workspace > aside {
+  min-width: 0;
 }
 
 .page-shell-dashboard {
@@ -264,6 +269,11 @@ p {
   padding: 0.85rem 0.95rem;
 }
 
+.selected-card {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(31, 111, 95, 0.12);
+}
+
 .browser-item p {
   margin: 0.35rem 0 0;
 }
@@ -278,9 +288,9 @@ p {
 }
 
 .detail-panel {
-  position: sticky;
-  top: 1rem;
-  align-self: start;
+  position: static;
+  top: auto;
+  align-self: stretch;
 }
 
 .detail-source-block {
@@ -376,6 +386,17 @@ p {
 .source-turn strong {
   font-size: 0.82rem;
   text-transform: capitalize;
+}
+
+.source-card span,
+.source-turn span,
+.list-card strong,
+.list-card span,
+.validation-card,
+.field-label textarea,
+.field-label input {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .danger-button {

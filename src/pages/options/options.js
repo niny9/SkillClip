@@ -1,5 +1,8 @@
 import { MESSAGE_TYPES } from "../../lib/constants.js";
 
+let latestState = null;
+let selectedAssetSnapshot = null;
+
 const SUPPORTED_HOSTS = [
   "chatgpt.com",
   "chat.openai.com",
@@ -16,6 +19,7 @@ async function load() {
     chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_SETTINGS })
   ]);
   const state = stateResponse.result;
+  latestState = state;
   const settings = settingsResponse.result;
 
   updateCount("conversations", state.conversations.filter((item) => !item.archivedAt).length);
@@ -45,6 +49,8 @@ function updateCount(key, value) {
 function renderJson(state) {
   const node = document.querySelector("[data-json-output]");
   node.value = JSON.stringify(state, null, 2);
+  selectedAssetSnapshot = null;
+  setAssetFeedback("Showing full snapshot / 当前显示全部快照。点击下方资产卡片可查看单条数据。");
 }
 
 function renderAssetBrowser(state) {
@@ -70,49 +76,67 @@ function renderAssetBrowser(state) {
       const subtitle = `${item.platform || "unknown"} · ${item.captureMode || "capture"}`;
       const preview = item.selectionText || item.promptText || item.messages?.[0]?.text || "";
       return `
-        <article class="browser-item">
+        <article class="browser-item clickable-card" data-asset-kind="conversation" data-asset-id="${item.id}">
           <strong>${escapeHtml(title)}</strong>
           <p class="muted">${escapeHtml(subtitle)}</p>
           <p>${escapeHtml(preview.slice(0, 180) || "No preview text yet.")}</p>
+          <div class="action-row">
+            <button type="button" data-action="delete-asset" data-kind="conversation" data-id="${item.id}">Delete / 删除</button>
+          </div>
         </article>
       `;
     }),
     renderBrowserList("Compile Preview / 编译预览", previewItems, (item) => `
-      <article class="browser-item">
+      <article class="browser-item clickable-card" data-asset-kind="draft" data-asset-id="${item.id}">
         <strong>${escapeHtml(item.name || "Untitled preview")}</strong>
         <p class="muted">${escapeHtml(item.useWhen || item.scenario || "Waiting for review before saving as draft.")}</p>
         <p>${escapeHtml((item.goal || item.promptTemplate || "").slice(0, 180) || "No structured goal yet.")}</p>
+        <div class="action-row">
+          <button type="button" data-action="delete-asset" data-kind="draft" data-id="${item.id}">Delete / 删除</button>
+        </div>
       </article>
     `),
     renderBrowserList("Drafts / 技能草稿", draftItems, (item) => `
-      <article class="browser-item">
+      <article class="browser-item clickable-card" data-asset-kind="draft" data-asset-id="${item.id}">
         <strong>${escapeHtml(item.name || "Untitled draft")}</strong>
         <p class="muted">${escapeHtml(item.useWhen || item.scenario || "No use-when summary yet.")}</p>
         <p>${escapeHtml((item.outputFormat || item.goal || "").slice(0, 180) || "No output format summary yet.")}</p>
+        <div class="action-row">
+          <button type="button" data-action="delete-asset" data-kind="draft" data-id="${item.id}">Delete / 删除</button>
+        </div>
       </article>
     `),
     renderBrowserList("Skills / 正式技能", skillItems, (item) => {
       const variantCount = variantItems.filter((variant) => variant.baseSkillId === item.id).length;
       return `
-        <article class="browser-item">
+        <article class="browser-item clickable-card" data-asset-kind="skill" data-asset-id="${item.id}">
           <strong>${escapeHtml(item.name || "Untitled skill")}</strong>
           <p class="muted">${escapeHtml(item.useWhen || item.scenario || "No use-when summary yet.")}</p>
           <p>${escapeHtml((item.successCriteria || item.outputFormat || "").slice(0, 180) || "No success criteria yet.")}</p>
           <p class="muted">Variants / 变体: ${variantCount}</p>
+          <div class="action-row">
+            <button type="button" data-action="delete-asset" data-kind="skill" data-id="${item.id}">Delete / 删除</button>
+          </div>
         </article>
       `;
     }),
     renderBrowserList("Variants / 技能变体", variantItems, (item) => `
-      <article class="browser-item">
+      <article class="browser-item clickable-card" data-asset-kind="variant" data-asset-id="${item.id}">
         <strong>${escapeHtml(item.name || "Untitled variant")}</strong>
         <p class="muted">${escapeHtml(item.baseSkillId ? `Base / 基础技能: ${item.baseSkillId}` : "No base skill linked.")}</p>
         <p>${escapeHtml((item.goal || item.promptTemplate || "").slice(0, 180) || "No variant summary yet.")}</p>
+        <div class="action-row">
+          <button type="button" data-action="delete-asset" data-kind="variant" data-id="${item.id}">Delete / 删除</button>
+        </div>
       </article>
     `),
     renderBrowserList("Archived / 已归档", archivedItems, (item) => `
-      <article class="browser-item">
+      <article class="browser-item clickable-card" data-asset-kind="${escapeHtml(item.kind || "conversation")}" data-asset-id="${item.id}">
         <strong>${escapeHtml(item.name || item.title || "Archived item")}</strong>
         <p class="muted">${escapeHtml(item.kind || "asset")}</p>
+        <div class="action-row">
+          <button type="button" data-action="delete-asset" data-kind="${escapeHtml(item.kind || "conversation")}" data-id="${item.id}">Delete / 删除</button>
+        </div>
       </article>
     `)
   ].join("");
@@ -248,6 +272,76 @@ function setSettingsFeedback(message) {
   }
 }
 
+function setAssetFeedback(message) {
+  const node = document.querySelector("[data-asset-feedback]");
+  if (node) {
+    node.textContent = message;
+  }
+}
+
+function getAssetByKindAndId(kind, id) {
+  if (!latestState) {
+    return null;
+  }
+
+  if (kind === "conversation") {
+    return latestState.conversations.find((item) => item.id === id) || null;
+  }
+  if (kind === "draft") {
+    return latestState.drafts.find((item) => item.id === id) || null;
+  }
+  if (kind === "skill") {
+    return latestState.skills.find((item) => item.id === id) || null;
+  }
+  if (kind === "variant") {
+    return latestState.variants.find((item) => item.id === id) || null;
+  }
+  return null;
+}
+
+function showSelectedAssetJson(kind, id) {
+  const asset = getAssetByKindAndId(kind, id);
+  if (!asset) {
+    setAssetFeedback("Could not find the selected asset.");
+    return;
+  }
+
+  const node = document.querySelector("[data-json-output]");
+  node.value = JSON.stringify(asset, null, 2);
+  selectedAssetSnapshot = { kind, id };
+  document.querySelector(".raw-json-wrap")?.setAttribute("open", "open");
+  setAssetFeedback(`Showing selected ${kind} / 当前显示选中的 ${kind} 数据。`);
+}
+
+async function deleteAsset(kind, id) {
+  const typeMap = {
+    conversation: MESSAGE_TYPES.DELETE_CONVERSATION,
+    draft: MESSAGE_TYPES.DELETE_DRAFT,
+    skill: MESSAGE_TYPES.DELETE_SKILL,
+    variant: MESSAGE_TYPES.DELETE_VARIANT
+  };
+  const payloadKeyMap = {
+    conversation: "conversationId",
+    draft: "draftId",
+    skill: "skillId",
+    variant: "variantId"
+  };
+
+  const type = typeMap[kind];
+  const payloadKey = payloadKeyMap[kind];
+  if (!type || !payloadKey) {
+    setAssetFeedback("This asset type cannot be deleted.");
+    return;
+  }
+
+  await chrome.runtime.sendMessage({
+    type,
+    payload: { [payloadKey]: id }
+  });
+  await load();
+  setAssetFeedback(`Deleted ${kind} / 已删除 ${kind}。`);
+}
+
 function collectSettingsFromForm() {
   const provider = document.querySelector("[data-setting='apiProvider']")?.value || "custom";
   const baseUrlInput = document.querySelector("[data-setting='apiBaseUrl']");
@@ -315,6 +409,11 @@ document.addEventListener("click", async (event) => {
     setFeedback("State refreshed.");
   }
 
+  if (action === "show-full-json") {
+    renderJson(latestState || {});
+    return;
+  }
+
   if (action === "copy-json") {
     const text = document.querySelector("[data-json-output]").value;
     await navigator.clipboard.writeText(text);
@@ -354,6 +453,16 @@ document.addEventListener("click", async (event) => {
       payload: collectSettingsFromForm()
     });
     setSettingsFeedback(response.result?.message || "Test finished.");
+  }
+
+  if (action === "delete-asset") {
+    await deleteAsset(target.dataset.kind, target.dataset.id);
+    return;
+  }
+
+  const assetCard = target.closest("[data-asset-id]");
+  if (assetCard instanceof HTMLElement && !target.closest("button")) {
+    showSelectedAssetJson(assetCard.dataset.assetKind, assetCard.dataset.assetId);
   }
 });
 

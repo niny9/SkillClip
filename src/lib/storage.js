@@ -89,6 +89,12 @@ export async function removeDraft(id) {
   await setBucket(STORAGE_KEYS.DRAFTS, next);
 }
 
+export async function removeConversation(id) {
+  const bucket = await getBucket(STORAGE_KEYS.CONVERSATIONS);
+  const next = bucket.filter((item) => item.id !== id);
+  await setBucket(STORAGE_KEYS.CONVERSATIONS, next);
+}
+
 export async function archiveConversation(id) {
   const bucket = await getBucket(STORAGE_KEYS.CONVERSATIONS);
   const next = bucket.map((item) => (
@@ -173,6 +179,18 @@ export async function restoreSkill(id) {
     status: "validated",
     updatedAt: new Date().toISOString()
   }));
+}
+
+export async function removeSkill(id) {
+  const bucket = await getBucket(STORAGE_KEYS.SKILLS);
+  const next = bucket.filter((item) => item.id !== id);
+  await setBucket(STORAGE_KEYS.SKILLS, next);
+}
+
+export async function removeVariant(id) {
+  const bucket = await getBucket(STORAGE_KEYS.VARIANTS);
+  const next = bucket.filter((item) => item.id !== id);
+  await setBucket(STORAGE_KEYS.VARIANTS, next);
 }
 
 export async function findDraftById(id) {

@@ -16,7 +16,10 @@ import {
   insertDraft,
   insertSkill,
   insertVariant,
+  removeConversation,
   removeDraft,
+  removeSkill,
+  removeVariant,
   resetAllState,
   restoreConversation,
   restoreDraft,
@@ -93,6 +96,14 @@ async function handleMessage(message, sender) {
       return restoreDraftItem(message.payload.draftId);
     case MESSAGE_TYPES.RESTORE_SKILL:
       return restoreSkillItem(message.payload.skillId);
+    case MESSAGE_TYPES.DELETE_CONVERSATION:
+      return deleteConversationItem(message.payload.conversationId);
+    case MESSAGE_TYPES.DELETE_DRAFT:
+      return deleteDraftItem(message.payload.draftId);
+    case MESSAGE_TYPES.DELETE_SKILL:
+      return deleteSkillItem(message.payload.skillId);
+    case MESSAGE_TYPES.DELETE_VARIANT:
+      return deleteVariantItem(message.payload.variantId);
     case MESSAGE_TYPES.UPDATE_DRAFT:
       return updateDraftItem(message.payload);
     case MESSAGE_TYPES.UPDATE_SKILL:
@@ -266,6 +277,30 @@ async function restoreSkillItem(skillId) {
   const item = await restoreSkill(skillId);
   await broadcastStorageUpdate();
   return item;
+}
+
+async function deleteConversationItem(conversationId) {
+  await removeConversation(conversationId);
+  await broadcastStorageUpdate();
+  return { deleted: true };
+}
+
+async function deleteDraftItem(draftId) {
+  await removeDraft(draftId);
+  await broadcastStorageUpdate();
+  return { deleted: true };
+}
+
+async function deleteSkillItem(skillId) {
+  await removeSkill(skillId);
+  await broadcastStorageUpdate();
+  return { deleted: true };
+}
+
+async function deleteVariantItem(variantId) {
+  await removeVariant(variantId);
+  await broadcastStorageUpdate();
+  return { deleted: true };
 }
 
 async function updateDraftItem(payload) {

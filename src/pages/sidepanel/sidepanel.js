@@ -1,6 +1,7 @@
 import { MESSAGE_TYPES } from "../../lib/constants.js";
 
 let latestState = null;
+let selectedDetail = null;
 
 async function load() {
   const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_STATE });
@@ -106,6 +107,7 @@ function renderConversation(item) {
       <div class="action-row">
         <button type="button" data-action="compile-conversation" data-id="${item.id}">Compile to Preview / 编译为预览</button>
         <button type="button" data-action="archive-conversation" data-id="${item.id}">Archive</button>
+        <button type="button" data-action="delete-conversation" data-id="${item.id}">Delete / 删除</button>
       </div>
     </article>
   `;
@@ -119,6 +121,7 @@ function renderDraft(item) {
       <div class="action-row">
         <button type="button" data-action="promote-draft" data-id="${item.id}">Promote to Skill</button>
         <button type="button" data-action="archive-draft" data-id="${item.id}">Archive</button>
+        <button type="button" data-action="delete-draft" data-id="${item.id}">Delete / 删除</button>
       </div>
     </article>
   `;
@@ -135,6 +138,7 @@ function renderPreviewDraft(item) {
       <div class="action-row">
         <button type="button" data-action="approve-preview" data-id="${item.id}">Save as Draft / 保存为草稿</button>
         <button type="button" data-action="archive-draft" data-id="${item.id}">Dismiss / 归档</button>
+        <button type="button" data-action="delete-draft" data-id="${item.id}">Delete / 删除</button>
       </div>
     </article>
   `;
@@ -152,6 +156,7 @@ function renderSkill(item, variantsForSkill = []) {
       <div class="action-row">
         <button type="button" data-action="create-variant" data-id="${item.id}">New Variant</button>
         <button type="button" data-action="archive-skill" data-id="${item.id}">Archive</button>
+        <button type="button" data-action="delete-skill" data-id="${item.id}">Delete / 删除</button>
       </div>
     </article>
   `;
@@ -159,11 +164,14 @@ function renderSkill(item, variantsForSkill = []) {
 
 function renderVariant(item, baseSkill) {
   return `
-    <article class="list-card">
+    <article class="list-card clickable-card" data-detail-kind="variant" data-detail-id="${item.id}">
       <strong>${escapeHtml(item.name)}</strong>
       <span>Variant / 技能变体 · For Skill / 所属技能: ${escapeHtml(baseSkill?.name || item.baseSkillId)}</span>
       <div class="meta-block">
         <small>${escapeHtml(item.changeSummary || "Variant")}</small>
+      </div>
+      <div class="action-row">
+        <button type="button" data-action="delete-variant" data-id="${item.id}">Delete / 删除</button>
       </div>
     </article>
   `;
@@ -189,6 +197,7 @@ function renderArchivedItem(item) {
       <span>Archived / 已归档 · ${escapeHtml(kindMap[item.archiveKind] || item.archiveKind || "item")}</span>
       <div class="action-row">
         <button type="button" data-action="${restoreAction}" data-id="${restoreId}">Restore / 恢复</button>
+        <button type="button" data-action="delete-${item.archiveKind}" data-id="${restoreId}">Delete / 删除</button>
       </div>
     </article>
   `;
@@ -197,7 +206,25 @@ function renderArchivedItem(item) {
 function showDetailPanel(item, kind) {
   const form = document.querySelector("[data-detail-form]");
   const empty = document.querySelector("[data-detail-empty]");
+  const title = document.querySelector("[data-detail-title]");
   if (!form || !empty) {
+    return;
+  }
+
+  selectedDetail = { id: item.id, kind };
+  updateSelectedCards();
+  if (title) {
+    const kindLabel = kind === "draft" ? "Draft / 草稿" : kind === "skill" ? "Skill / 正式技能" : "Variant / 变体";
+    title.textContent = `Selected / 当前选中: ${kindLabel} - ${item.name || item.id}`;
+  }
+
+  if (kind === "variant") {
+    empty.hidden = false;
+    empty.textContent = "Variant details are visible as summary only for now. You can compare it in the list or delete it.";
+    form.hidden = true;
+    renderExtractionPreview(null);
+    renderValidationPreview(null);
+    renderSourcePreview({ sourceConversationIds: [] });
     return;
   }
 
@@ -228,13 +255,19 @@ function hideDetailPanel() {
   const extractionContent = document.querySelector("[data-extraction-content]");
   const validationPanel = document.querySelector("[data-validation-panel]");
   const validationContent = document.querySelector("[data-validation-content]");
+  const title = document.querySelector("[data-detail-title]");
   if (!form || !empty) {
     return;
   }
 
+  selectedDetail = null;
+  updateSelectedCards();
   form.hidden = true;
   form.reset();
   empty.hidden = false;
+  if (title) {
+    title.textContent = "Nothing selected / 当前未选中任何条目";
+  }
   if (sourcePanel) {
     sourcePanel.hidden = true;
   }
@@ -253,6 +286,18 @@ function hideDetailPanel() {
   if (validationContent) {
     validationContent.innerHTML = "";
   }
+}
+
+function updateSelectedCards() {
+  document.querySelectorAll("[data-detail-id]").forEach((node) => {
+    if (!(node instanceof HTMLElement)) {
+      return;
+    }
+    const isSelected = selectedDetail
+      && node.dataset.detailId === selectedDetail.id
+      && node.dataset.detailKind === selectedDetail.kind;
+    node.classList.toggle("selected-card", Boolean(isSelected));
+  });
 }
 
 function renderExtractionPreview(extraction) {
@@ -414,6 +459,13 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
+  if (action === "delete-conversation" && id) {
+    await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.DELETE_CONVERSATION, payload: { conversationId: id } });
+    setFeedback("Conversation deleted.");
+    hideDetailPanel();
+    return;
+  }
+
   if (action === "compile-conversation" && id) {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.COMPILE_CONVERSATION, payload: { conversationId: id } });
     setFeedback("Inbox item compiled into preview.");
@@ -425,8 +477,29 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
+  if (action === "delete-draft" && id) {
+    await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.DELETE_DRAFT, payload: { draftId: id } });
+    setFeedback("Draft deleted.");
+    hideDetailPanel();
+    return;
+  }
+
   if (action === "archive-skill" && id) {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.ARCHIVE_SKILL, payload: { skillId: id } });
+    return;
+  }
+
+  if (action === "delete-skill" && id) {
+    await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.DELETE_SKILL, payload: { skillId: id } });
+    setFeedback("Skill deleted.");
+    hideDetailPanel();
+    return;
+  }
+
+  if (action === "delete-variant" && id) {
+    await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.DELETE_VARIANT, payload: { variantId: id } });
+    setFeedback("Variant deleted.");
+    hideDetailPanel();
     return;
   }
 
@@ -529,6 +602,22 @@ document.addEventListener("click", async (event) => {
       showDetailPanel(item, "skill");
     }
   }
+
+  if (detailKind === "variant") {
+    const item = latestState.variants.find((variant) => variant.id === detailId);
+    if (item) {
+      showDetailPanel({
+        ...item,
+        scenario: item.scenarioOverride || "",
+        useWhen: "",
+        notFor: "",
+        goal: item.changeSummary || "",
+        outputFormat: "",
+        successCriteria: [],
+        steps: item.steps || []
+      }, "variant");
+    }
+  }
 });
 
 document.querySelector("[data-detail-form]")?.addEventListener("submit", async (event) => {
@@ -563,6 +652,10 @@ document.querySelector("[data-detail-form]")?.addEventListener("submit", async (
   if (kind === "skill") {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.UPDATE_SKILL, payload });
     setFeedback("Skill updated.");
+  }
+
+  if (kind === "variant") {
+    setFeedback("Variant editing is read-only for now. You can delete it or recreate it from a skill.");
   }
 });
 

@@ -66,12 +66,16 @@
         <article class="card">
           <h2>Quick Test</h2>
           <div class="stack compact-stack">
-            <button type="button" data-action="open-actionbar">Open Action Bar On Active Tab</button>
-            <button type="button" data-action="open-palette">Open Skill Palette On Active Tab</button>
+            <button type="button" data-action="open-actionbar">Open Action Bar On Active Tab / 在 AI 页面打开操作条</button>
+            <button type="button" data-action="open-palette">Open Skill Palette On Active Tab / 在 AI 页面打开技能面板</button>
           </div>
           <p class="muted" data-action-feedback>
             Start on a supported AI page, then trigger the in-page UI from here.
           </p>
+          <div class="checklist">
+            <p>`Action Bar` 用来保存 prompt、保存 whole flow、语音输入、编译为预览。</p>
+            <p>`Skill Palette` 用来把正式技能重新插入当前 AI 输入框，不是用来新建技能。</p>
+          </div>
         </article>
       </section>
 
@@ -159,10 +163,12 @@
         </p>
         <div class="action-row">
           <button type="button" data-action="refresh-state">Refresh Snapshot</button>
+          <button type="button" data-action="show-full-json">Show Full Snapshot / 显示全部快照</button>
           <button type="button" data-action="copy-json">Copy JSON</button>
           <button type="button" data-action="download-json">Download JSON</button>
         </div>
         <div class="asset-browser" data-asset-browser></div>
+        <p class="muted" data-asset-feedback>Click an asset card to inspect only that item's JSON here.</p>
         <details class="raw-json-wrap">
           <summary>Raw JSON / 原始数据</summary>
           <textarea data-json-output class="code-area" spellcheck="false"></textarea>
