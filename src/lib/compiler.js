@@ -86,7 +86,7 @@ export function compileSkillDraft(payload, settings = {}) {
   const draft = {
     id: createId("draft"),
     kind: "skill_draft",
-    status: "draft",
+    status: "preview",
     name,
     whatItDoes: `Turns a captured AI workflow into a reusable method for ${scenario.toLowerCase()}.`,
     scenario,

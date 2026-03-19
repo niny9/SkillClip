@@ -11,11 +11,16 @@ const SUPPORTED_HOSTS = [
 ];
 
 async function load() {
-  const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_STATE });
-  const state = response.result;
+  const [stateResponse, settingsResponse] = await Promise.all([
+    chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_STATE }),
+    chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_SETTINGS })
+  ]);
+  const state = stateResponse.result;
+  const settings = settingsResponse.result;
 
   updateCount("conversations", state.conversations.filter((item) => !item.archivedAt).length);
-  updateCount("drafts", state.drafts.filter((item) => item.status !== "archived").length);
+  updateCount("previews", state.drafts.filter((item) => item.status === "preview").length);
+  updateCount("drafts", state.drafts.filter((item) => item.status === "draft").length);
   updateCount("skills", state.skills.filter((item) => item.status !== "archived").length);
   updateCount("variants", state.variants.length);
   updateCount(
@@ -25,6 +30,7 @@ async function load() {
       + state.skills.filter((item) => item.status === "archived").length
   );
   renderJson(state);
+  populateSettings(settings || {});
   await renderActiveTabStatus();
 }
 
@@ -38,6 +44,30 @@ function updateCount(key, value) {
 function renderJson(state) {
   const node = document.querySelector("[data-json-output]");
   node.value = JSON.stringify(state, null, 2);
+}
+
+function populateSettings(settings) {
+  const provider = document.querySelector("[data-setting='apiProvider']");
+  const mode = document.querySelector("[data-setting='validationMode']");
+  const apiBaseUrl = document.querySelector("[data-setting='apiBaseUrl']");
+  const apiModel = document.querySelector("[data-setting='apiModel']");
+  const apiKey = document.querySelector("[data-setting='apiKey']");
+
+  if (provider) {
+    provider.value = settings.apiProvider || "custom";
+  }
+  if (mode) {
+    mode.value = settings.validationMode || "local";
+  }
+  if (apiBaseUrl) {
+    apiBaseUrl.value = settings.apiBaseUrl || "";
+  }
+  if (apiModel) {
+    apiModel.value = settings.apiModel || "";
+  }
+  if (apiKey) {
+    apiKey.value = settings.apiKey || "";
+  }
 }
 
 async function renderActiveTabStatus() {
@@ -87,6 +117,36 @@ async function withActiveTab(callback) {
 function setFeedback(message) {
   const node = document.querySelector("[data-action-feedback]");
   node.textContent = message;
+}
+
+function setSettingsFeedback(message) {
+  const node = document.querySelector("[data-settings-feedback]");
+  if (node) {
+    node.textContent = message;
+  }
+}
+
+function collectSettingsFromForm() {
+  const provider = document.querySelector("[data-setting='apiProvider']")?.value || "custom";
+  const baseUrlInput = document.querySelector("[data-setting='apiBaseUrl']");
+  const modelInput = document.querySelector("[data-setting='apiModel']");
+  const keyInput = document.querySelector("[data-setting='apiKey']");
+  const resolvedBaseUrl = baseUrlInput?.value.trim() || getSuggestedBaseUrl(provider);
+
+  return {
+    validationMode: document.querySelector("[data-setting='validationMode']")?.value || "local",
+    apiProvider: provider,
+    apiBaseUrl: resolvedBaseUrl,
+    apiModel: modelInput?.value.trim() || "",
+    apiKey: keyInput?.value.trim() || ""
+  };
+}
+
+function getSuggestedBaseUrl(provider) {
+  if (provider === "zhipu") {
+    return "https://open.bigmodel.cn/api/paas/v4";
+  }
+  return "";
 }
 
 function downloadJson(text) {
@@ -152,6 +212,39 @@ document.addEventListener("click", async (event) => {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.SEED_DEMO });
     await load();
     setFeedback("Demo skill seeded.");
+  }
+
+  if (action === "save-settings") {
+    await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.UPDATE_SETTINGS,
+      payload: collectSettingsFromForm()
+    });
+    await load();
+    setSettingsFeedback("Validation settings saved.");
+  }
+
+  if (action === "test-api") {
+    setSettingsFeedback("Testing API connection...");
+    const response = await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.TEST_API_CONNECTION,
+      payload: collectSettingsFromForm()
+    });
+    setSettingsFeedback(response.result?.message || "Test finished.");
+  }
+});
+
+document.querySelector("[data-setting='apiProvider']")?.addEventListener("change", (event) => {
+  const provider = event.target.value;
+  const baseUrlInput = document.querySelector("[data-setting='apiBaseUrl']");
+  const modelInput = document.querySelector("[data-setting='apiModel']");
+
+  if (provider === "zhipu") {
+    if (baseUrlInput && !baseUrlInput.value.trim()) {
+      baseUrlInput.value = "https://open.bigmodel.cn/api/paas/v4";
+    }
+    if (modelInput && !modelInput.value.trim()) {
+      modelInput.value = "glm-4.5-air";
+    }
   }
 });
 

@@ -1,4 +1,5 @@
 import { compileSkillDraft, createVariantFromSkill, promoteDraftToSkill } from "../lib/compiler.js";
+import { extractSkillDraftWithApi, reviewSkillWithApi, testApiConnection } from "../lib/api-review.js";
 import { MESSAGE_TYPES } from "../lib/constants.js";
 import { ensureContentScript } from "../lib/injection.js";
 import { validateSkillAsset } from "../lib/validator.js";
@@ -70,6 +71,8 @@ async function handleMessage(message, sender) {
       return getAllState();
     case MESSAGE_TYPES.INSERT_SKILL:
       return trackSkillUsage(message.payload.skillId);
+    case MESSAGE_TYPES.APPROVE_DRAFT_PREVIEW:
+      return approveDraftPreview(message.payload.draftId);
     case MESSAGE_TYPES.PROMOTE_DRAFT:
       return promoteDraft(message.payload.draftId);
     case MESSAGE_TYPES.CREATE_VARIANT:
@@ -86,6 +89,10 @@ async function handleMessage(message, sender) {
       return updateSkillItem(message.payload);
     case MESSAGE_TYPES.UPDATE_SETTINGS:
       return updateSettingsItem(message.payload);
+    case MESSAGE_TYPES.GET_SETTINGS:
+      return getSettings();
+    case MESSAGE_TYPES.TEST_API_CONNECTION:
+      return testApiConnection(message.payload);
     case MESSAGE_TYPES.RESET_STATE:
       return resetState();
     case MESSAGE_TYPES.SEED_DEMO:
@@ -128,10 +135,19 @@ async function saveConversationMemory(payload, captureMode) {
 async function compileConversationToDraft(payload) {
   const settings = await getSettings();
   const memory = await saveConversationMemory(payload, "recent_turns");
-  const draft = compileSkillDraft({
+  let draft = compileSkillDraft({
     ...payload,
     conversationId: memory.id
   }, settings);
+
+  if (settings.validationMode === "api") {
+    draft = await extractSkillDraftWithApi({
+      ...payload,
+      conversationId: memory.id
+    }, draft, settings);
+  }
+
+  draft = await applyApiValidationIfNeeded(draft, settings);
 
   await insertDraft(draft);
   await broadcastStorageUpdate();
@@ -146,11 +162,29 @@ async function promoteDraft(draftId) {
   }
 
   const settings = await getSettings();
-  const skill = promoteDraftToSkill(draft, settings);
+  let skill = promoteDraftToSkill(draft, settings);
+  skill = await applyApiValidationIfNeeded(skill, settings);
   await insertSkill(skill);
   await removeDraft(draftId);
   await broadcastStorageUpdate();
   return skill;
+}
+
+async function approveDraftPreview(draftId) {
+  const settings = await getSettings();
+  const item = await updateDraft(draftId, (draft) => {
+    const nextDraft = {
+      ...draft,
+      status: "draft"
+    };
+    return {
+      ...nextDraft,
+      validation: validateSkillAsset(nextDraft, settings),
+      updatedAt: nowIso()
+    };
+  });
+  await broadcastStorageUpdate();
+  return item;
 }
 
 async function createVariant(skillId) {
@@ -195,8 +229,9 @@ async function archiveSkillItem(skillId) {
 
 async function updateDraftItem(payload) {
   const settings = await getSettings();
-  const item = await updateDraft(payload.id, (draft) => ({
-    ...draft,
+  const baseDraft = await findDraftById(payload.id);
+  const nextDraft = {
+    ...baseDraft,
     name: payload.name,
     whatItDoes: payload.whatItDoes,
     scenario: payload.scenario,
@@ -206,11 +241,16 @@ async function updateDraftItem(payload) {
     promptTemplate: payload.promptTemplate,
     outputFormat: payload.outputFormat,
     successCriteria: payload.successCriteria,
-    steps: payload.steps,
-    validation: validateSkillAsset({
-      ...draft,
-      ...payload
-    }, settings),
+    steps: payload.steps
+  };
+  const validated = await applyApiValidationIfNeeded({
+    ...nextDraft,
+    validation: validateSkillAsset(nextDraft, settings)
+  }, settings);
+
+  const item = await updateDraft(payload.id, (draft) => ({
+    ...draft,
+    ...validated,
     updatedAt: nowIso()
   }));
   await broadcastStorageUpdate();
@@ -219,8 +259,9 @@ async function updateDraftItem(payload) {
 
 async function updateSkillItem(payload) {
   const settings = await getSettings();
-  const item = await updateSkill(payload.id, (skill) => ({
-    ...skill,
+  const baseSkill = await findSkillById(payload.id);
+  const nextSkill = {
+    ...baseSkill,
     name: payload.name,
     whatItDoes: payload.whatItDoes,
     scenario: payload.scenario,
@@ -230,11 +271,16 @@ async function updateSkillItem(payload) {
     promptTemplate: payload.promptTemplate,
     outputFormat: payload.outputFormat,
     successCriteria: payload.successCriteria,
-    steps: payload.steps,
-    validation: validateSkillAsset({
-      ...skill,
-      ...payload
-    }, settings),
+    steps: payload.steps
+  };
+  const validated = await applyApiValidationIfNeeded({
+    ...nextSkill,
+    validation: validateSkillAsset(nextSkill, settings)
+  }, settings);
+
+  const item = await updateSkill(payload.id, (skill) => ({
+    ...skill,
+    ...validated,
     updatedAt: nowIso()
   }));
   await broadcastStorageUpdate();
@@ -258,6 +304,18 @@ async function updateSettingsItem(payload) {
   const settings = await updateSettings(payload);
   await broadcastStorageUpdate();
   return settings;
+}
+
+async function applyApiValidationIfNeeded(asset, settings) {
+  if (settings.validationMode !== "api") {
+    return asset;
+  }
+
+  const apiValidation = await reviewSkillWithApi(asset, settings);
+  return {
+    ...asset,
+    validation: apiValidation
+  };
 }
 
 async function ensureContentScriptForTab(tabId) {

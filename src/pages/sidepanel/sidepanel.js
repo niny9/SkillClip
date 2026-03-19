@@ -8,7 +8,8 @@ async function load() {
   latestState = state;
 
   const activeConversations = state.conversations.filter((item) => !item.archivedAt);
-  const activeDrafts = state.drafts.filter((item) => item.status !== "archived");
+  const previewDrafts = state.drafts.filter((item) => item.status === "preview");
+  const activeDrafts = state.drafts.filter((item) => item.status === "draft");
   const activeSkills = state.skills.filter((item) => item.status !== "archived");
   const archivedItems = [
     ...state.conversations.filter((item) => item.archivedAt).map((item) => ({ ...item, archiveKind: "conversation" })),
@@ -17,6 +18,7 @@ async function load() {
   ];
 
   renderList("[data-inbox]", activeConversations, renderConversation);
+  renderList("[data-previews]", previewDrafts, renderPreviewDraft);
   renderList("[data-drafts]", activeDrafts, renderDraft);
   renderSkills("[data-skills]", activeSkills, state.variants);
   renderVariants("[data-variants]", state.variants, state.skills);
@@ -114,6 +116,22 @@ function renderDraft(item) {
   `;
 }
 
+function renderPreviewDraft(item) {
+  return `
+    <article class="list-card clickable-card" data-detail-kind="draft" data-detail-id="${item.id}">
+      <strong>${escapeHtml(item.name)}</strong>
+      <span>Preview / 编译预览 · ${escapeHtml(item.scenario || "Skill preview")}</span>
+      <div class="meta-block">
+        <small>Review this result before saving it as a draft.</small>
+      </div>
+      <div class="action-row">
+        <button type="button" data-action="approve-preview" data-id="${item.id}">Save as Draft / 保存为草稿</button>
+        <button type="button" data-action="archive-draft" data-id="${item.id}">Dismiss / 归档</button>
+      </div>
+    </article>
+  `;
+}
+
 function renderSkill(item, variantsForSkill = []) {
   return `
     <article class="list-card clickable-card" data-detail-kind="skill" data-detail-id="${item.id}">
@@ -171,9 +189,15 @@ function showDetailPanel(item, kind) {
   form.elements.kind.value = kind;
   form.elements.name.value = item.name || "";
   form.elements.scenario.value = item.scenario || "";
+  form.elements.useWhen.value = item.useWhen || "";
+  form.elements.notFor.value = item.notFor || "";
   form.elements.goal.value = item.goal || "";
   form.elements.promptTemplate.value = item.promptTemplate || "";
   form.elements.steps.value = (item.steps || []).join("\n");
+  form.elements.outputFormat.value = item.outputFormat || "";
+  form.elements.successCriteria.value = (item.successCriteria || []).join("\n");
+  renderExtractionPreview(item.extraction);
+  renderValidationPreview(item.validation);
   renderSourcePreview(item);
 }
 
@@ -182,6 +206,10 @@ function hideDetailPanel() {
   const empty = document.querySelector("[data-detail-empty]");
   const sourcePanel = document.querySelector("[data-source-panel]");
   const sourceContent = document.querySelector("[data-source-content]");
+  const extractionPanel = document.querySelector("[data-extraction-panel]");
+  const extractionContent = document.querySelector("[data-extraction-content]");
+  const validationPanel = document.querySelector("[data-validation-panel]");
+  const validationContent = document.querySelector("[data-validation-content]");
   if (!form || !empty) {
     return;
   }
@@ -195,6 +223,74 @@ function hideDetailPanel() {
   if (sourceContent) {
     sourceContent.innerHTML = "";
   }
+  if (extractionPanel) {
+    extractionPanel.hidden = true;
+  }
+  if (extractionContent) {
+    extractionContent.innerHTML = "";
+  }
+  if (validationPanel) {
+    validationPanel.hidden = true;
+  }
+  if (validationContent) {
+    validationContent.innerHTML = "";
+  }
+}
+
+function renderExtractionPreview(extraction) {
+  const panel = document.querySelector("[data-extraction-panel]");
+  const content = document.querySelector("[data-extraction-content]");
+  if (!panel || !content) {
+    return;
+  }
+
+  if (!extraction) {
+    panel.hidden = false;
+    content.innerHTML = "<p class='muted'>Local heuristic extraction / 本地规则抽取</p>";
+    return;
+  }
+
+  panel.hidden = false;
+  content.innerHTML = `
+    <div class="meta-block">
+      <small>Mode / 模式: ${escapeHtml(extraction.mode || "unknown")}</small>
+      <small>Provider / 服务商: ${escapeHtml(extraction.provider || "local")}</small>
+      <small>Model / 模型: ${escapeHtml(extraction.model || "heuristic")}</small>
+      <small>Extracted At / 抽取时间: ${escapeHtml(extraction.extractedAt || "")}</small>
+    </div>
+  `;
+}
+
+function renderValidationPreview(validation) {
+  const panel = document.querySelector("[data-validation-panel]");
+  const content = document.querySelector("[data-validation-content]");
+  if (!panel || !content) {
+    return;
+  }
+
+  if (!validation) {
+    panel.hidden = false;
+    content.innerHTML = "<p class='muted'>No validation result yet.</p>";
+    return;
+  }
+
+  panel.hidden = false;
+  const issues = validation.issues?.length
+    ? validation.issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join("")
+    : "<li>No major issues found.</li>";
+
+  content.innerHTML = `
+    <div class="validation-card status-${escapeHtml(validation.status || "unknown")}">
+      <div class="validation-topline">
+        <div class="status-pill status-${escapeHtml(validation.status || "unknown")}">
+          ${escapeHtml(validation.mode || "local")} · ${escapeHtml(validation.status || "unknown")}
+        </div>
+        ${validation.score != null ? `<strong class="validation-score">${escapeHtml(String(validation.score))}</strong>` : ""}
+      </div>
+      <p class="muted">${validation.checkedAt ? `Checked at / 检查时间: ${escapeHtml(validation.checkedAt)}` : "No timestamp yet."}</p>
+      <ul class="detail-list">${issues}</ul>
+    </div>
+  `;
 }
 
 function renderSourcePreview(item) {
@@ -281,6 +377,12 @@ document.addEventListener("click", async (event) => {
 
   if (action === "promote-draft" && id) {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.PROMOTE_DRAFT, payload: { draftId: id } });
+    return;
+  }
+
+  if (action === "approve-preview" && id) {
+    await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.APPROVE_DRAFT_PREVIEW, payload: { draftId: id } });
+    setFeedback("Preview saved as draft.");
     return;
   }
 
@@ -395,8 +497,15 @@ document.querySelector("[data-detail-form]")?.addEventListener("submit", async (
     id: String(formData.get("id") || ""),
     name: String(formData.get("name") || ""),
     scenario: String(formData.get("scenario") || ""),
+    useWhen: String(formData.get("useWhen") || ""),
+    notFor: String(formData.get("notFor") || ""),
     goal: String(formData.get("goal") || ""),
     promptTemplate: String(formData.get("promptTemplate") || ""),
+    outputFormat: String(formData.get("outputFormat") || ""),
+    successCriteria: String(formData.get("successCriteria") || "")
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean),
     steps: String(formData.get("steps") || "")
       .split("\n")
       .map((item) => item.trim())

@@ -41,6 +41,10 @@
               <strong data-count="conversations">0</strong>
             </div>
             <div class="status-line">
+              <span>Compile previews / 编译预览</span>
+              <strong data-count="previews">0</strong>
+            </div>
+            <div class="status-line">
               <span>Skill drafts / 技能草稿</span>
               <strong data-count="drafts">0</strong>
             </div>
@@ -76,10 +80,11 @@
           <h2>How To Use / 如何使用</h2>
           <div class="checklist">
             <p>1. Inbox / 待整理素材：先存原始 prompt 或最近对话。</p>
-            <p>2. Draft / 技能草稿：系统把原始内容整理成草稿。</p>
-            <p>3. Skill / 正式技能：你确认后，草稿升级成可复用技能。</p>
-            <p>4. Variant / 技能变体：在原有 skill 基础上分叉出新版本。</p>
-            <p>5. Archive / 归档：不会删除，只是移到归档区。</p>
+            <p>2. Compile Preview / 编译预览：系统先生成预览给你审核。</p>
+            <p>3. Draft / 技能草稿：确认后再保存成草稿。</p>
+            <p>4. Skill / 正式技能：你确认后，草稿升级成可复用技能。</p>
+            <p>5. Variant / 技能变体：在原有 skill 基础上分叉出新版本。</p>
+            <p>6. Archive / 归档：不会删除，只是移到归档区。</p>
           </div>
         </article>
 
@@ -92,6 +97,47 @@
             <p>4. Open the service worker console from `chrome://extensions` for runtime errors.</p>
           </div>
         </article>
+      </section>
+
+      <section class="card">
+        <h2>Validation Mode / 校验模式</h2>
+        <div class="checklist">
+          <p>Choose how SkillClip judges whether an extracted skill is reasonable.</p>
+        </div>
+        <label class="field-label">
+          <span>Mode / 模式</span>
+          <select data-setting="validationMode">
+            <option value="local">Local heuristic / 本地规则判断</option>
+            <option value="api">AI API review / AI 模型复核</option>
+          </select>
+        </label>
+        <label class="field-label">
+          <span>Provider / 服务商</span>
+          <select data-setting="apiProvider">
+            <option value="custom">Custom / 自定义</option>
+            <option value="zhipu">Zhipu / 智谱</option>
+            <option value="openai_compatible">OpenAI-Compatible / 兼容 OpenAI</option>
+          </select>
+        </label>
+        <label class="field-label">
+          <span>API Base URL / 接口地址</span>
+          <input data-setting="apiBaseUrl" type="text" placeholder="https://api.example.com/v1/chat/completions" />
+        </label>
+        <label class="field-label">
+          <span>API Model / 模型名</span>
+          <input data-setting="apiModel" type="text" placeholder="gpt-4.1-mini / custom-model" />
+        </label>
+        <label class="field-label">
+          <span>API Key / 密钥</span>
+          <input data-setting="apiKey" type="password" placeholder="Stored locally in this prototype" />
+        </label>
+        <div class="action-row">
+          <button type="button" data-action="test-api">Test API Connection / 测试接口连通</button>
+          <button type="button" data-action="save-settings">Save Validation Settings / 保存校验设置</button>
+        </div>
+        <p class="muted" data-settings-feedback>
+          Local mode works now. API mode is scaffolded, but full remote validation still needs endpoint permission strategy.
+        </p>
       </section>
 
       <section class="card">

@@ -18,7 +18,8 @@
     "https://claude.ai/*",
     "https://gemini.google.com/*",
     "https://www.perplexity.ai/*",
-    "https://chat.deepseek.com/*"
+    "https://chat.deepseek.com/*",
+    "https://open.bigmodel.cn/*"
   ],
   "background": {
     "service_worker": "src/background/service-worker.js",

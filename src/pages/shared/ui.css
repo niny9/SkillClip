@@ -26,7 +26,8 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -44,7 +45,8 @@ button:hover {
 }
 
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -251,6 +253,12 @@ p {
   border-top: 1px solid var(--line);
 }
 
+.detail-validation-block {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
 .field-label {
   display: grid;
   gap: 0.45rem;
@@ -260,6 +268,54 @@ p {
 .field-label span {
   color: var(--muted);
   font-size: 0.92rem;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.86rem;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.status-strong {
+  color: #1f6f5f;
+}
+
+.status-needs_review {
+  color: #9b6b00;
+}
+
+.status-weak,
+.status-pending_setup {
+  color: #8f2d21;
+}
+
+.detail-list {
+  margin: 0.75rem 0 0;
+  padding-left: 1.2rem;
+  color: var(--muted);
+}
+
+.validation-card {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 0.85rem 0.95rem;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.validation-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.validation-score {
+  font-size: 1.35rem;
 }
 
 .source-card {

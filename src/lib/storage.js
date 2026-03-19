@@ -13,6 +13,7 @@ export async function getSettings() {
   const result = await chrome.storage.local.get([STORAGE_KEYS.SETTINGS]);
   return {
     validationMode: "local",
+    apiProvider: "custom",
     apiBaseUrl: "",
     apiModel: "",
     apiKey: "",
@@ -43,9 +44,10 @@ export async function getAllState() {
     variants: result[STORAGE_KEYS.VARIANTS] || [],
     settings: {
       validationMode: "local",
+      apiProvider: "custom",
       apiBaseUrl: "",
       apiModel: "",
-      apiKey: "",
+      apiKey: result[STORAGE_KEYS.SETTINGS]?.apiKey ? "********" : "",
       ...(result[STORAGE_KEYS.SETTINGS] || {})
     }
   };
