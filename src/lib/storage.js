@@ -17,6 +17,8 @@ export async function getSettings() {
     apiBaseUrl: "",
     apiModel: "",
     apiKey: "",
+    autoCompileAfterCapture: true,
+    openWorkspaceAfterCapture: true,
     ...(result[STORAGE_KEYS.SETTINGS] || {})
   };
 }
@@ -98,13 +100,47 @@ export async function archiveConversation(id) {
   return next.find((item) => item.id === id) || null;
 }
 
+export async function restoreConversation(id) {
+  const bucket = await getBucket(STORAGE_KEYS.CONVERSATIONS);
+  const next = bucket.map((item) => (
+    item.id === id
+      ? { ...item, archivedAt: null }
+      : item
+  ));
+  await setBucket(STORAGE_KEYS.CONVERSATIONS, next);
+  return next.find((item) => item.id === id) || null;
+}
+
 export async function archiveDraft(id) {
   const bucket = await getBucket(STORAGE_KEYS.DRAFTS);
   const next = bucket.map((item) => (
     item.id === id
-      ? { ...item, archivedAt: new Date().toISOString(), status: "archived" }
+      ? {
+        ...item,
+        archivedAt: new Date().toISOString(),
+        previousStatus: item.status,
+        status: "archived"
+      }
       : item
   ));
+  await setBucket(STORAGE_KEYS.DRAFTS, next);
+  return next.find((item) => item.id === id) || null;
+}
+
+export async function restoreDraft(id) {
+  const bucket = await getBucket(STORAGE_KEYS.DRAFTS);
+  const next = bucket.map((item) => {
+    if (item.id !== id) {
+      return item;
+    }
+
+    return {
+      ...item,
+      archivedAt: null,
+      status: item.previousStatus || "draft",
+      previousStatus: null
+    };
+  });
   await setBucket(STORAGE_KEYS.DRAFTS, next);
   return next.find((item) => item.id === id) || null;
 }
@@ -127,6 +163,14 @@ export async function archiveSkill(id) {
   return updateSkill(id, (skill) => ({
     ...skill,
     status: "archived",
+    updatedAt: new Date().toISOString()
+  }));
+}
+
+export async function restoreSkill(id) {
+  return updateSkill(id, (skill) => ({
+    ...skill,
+    status: "validated",
     updatedAt: new Date().toISOString()
   }));
 }

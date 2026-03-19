@@ -14,6 +14,7 @@
     COMPILE_SKILL: "skillclip/compile-skill",
     INSERT_SKILL: "skillclip/insert-skill",
     GET_STATE: "skillclip/get-state",
+    GET_SETTINGS: "skillclip/get-settings",
     STORAGE_UPDATED: "skillclip/storage-updated",
     OPEN_SIDE_PANEL: "skillclip/open-side-panel"
   };
@@ -258,23 +259,27 @@
       }
 
       const payload = buildCapturePayload(action);
+      const settingsResponse = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_SETTINGS });
+      const settings = settingsResponse?.result || {};
 
       if (action === "save-prompt") {
-        await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.SAVE_PROMPT, payload });
-        showToast("Saved to Inbox");
+        const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.SAVE_PROMPT, payload });
+        showToast(response?.result?.preview ? "Saved and compiled into preview" : "Saved to Inbox");
       }
 
       if (action === "save-flow") {
-        await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.SAVE_FLOW, payload });
-        showToast("Whole flow saved");
+        const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.SAVE_FLOW, payload });
+        showToast(response?.result?.preview ? "Flow saved and compiled into preview" : "Whole flow saved");
       }
 
       if (action === "compile-skill") {
         await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.COMPILE_SKILL, payload });
-        showToast("Compiled into a skill draft");
+        showToast("Compiled into preview");
       }
 
-      await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.OPEN_SIDE_PANEL });
+      if (settings.openWorkspaceAfterCapture !== false) {
+        await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.OPEN_SIDE_PANEL });
+      }
       closeActionBar();
     });
 

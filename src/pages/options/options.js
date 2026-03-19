@@ -30,6 +30,7 @@ async function load() {
       + state.skills.filter((item) => item.status === "archived").length
   );
   renderJson(state);
+  renderAssetBrowser(state);
   populateSettings(settings || {});
   await renderActiveTabStatus();
 }
@@ -46,12 +47,110 @@ function renderJson(state) {
   node.value = JSON.stringify(state, null, 2);
 }
 
+function renderAssetBrowser(state) {
+  const node = document.querySelector("[data-asset-browser]");
+  if (!node) {
+    return;
+  }
+
+  const inboxItems = state.conversations.filter((item) => !item.archivedAt);
+  const previewItems = state.drafts.filter((item) => item.status === "preview");
+  const draftItems = state.drafts.filter((item) => item.status === "draft");
+  const skillItems = state.skills.filter((item) => item.status !== "archived");
+  const variantItems = state.variants || [];
+  const archivedItems = [
+    ...state.conversations.filter((item) => item.archivedAt).map((item) => ({ ...item, kind: "conversation" })),
+    ...state.drafts.filter((item) => item.status === "archived").map((item) => ({ ...item, kind: "draft" })),
+    ...state.skills.filter((item) => item.status === "archived").map((item) => ({ ...item, kind: "skill" }))
+  ];
+
+  node.innerHTML = [
+    renderBrowserList("Inbox / 待整理素材", inboxItems, (item) => {
+      const title = item.title || item.selectionText || item.platform || "Untitled capture";
+      const subtitle = `${item.platform || "unknown"} · ${item.captureMode || "capture"}`;
+      const preview = item.selectionText || item.promptText || item.messages?.[0]?.text || "";
+      return `
+        <article class="browser-item">
+          <strong>${escapeHtml(title)}</strong>
+          <p class="muted">${escapeHtml(subtitle)}</p>
+          <p>${escapeHtml(preview.slice(0, 180) || "No preview text yet.")}</p>
+        </article>
+      `;
+    }),
+    renderBrowserList("Compile Preview / 编译预览", previewItems, (item) => `
+      <article class="browser-item">
+        <strong>${escapeHtml(item.name || "Untitled preview")}</strong>
+        <p class="muted">${escapeHtml(item.useWhen || item.scenario || "Waiting for review before saving as draft.")}</p>
+        <p>${escapeHtml((item.goal || item.promptTemplate || "").slice(0, 180) || "No structured goal yet.")}</p>
+      </article>
+    `),
+    renderBrowserList("Drafts / 技能草稿", draftItems, (item) => `
+      <article class="browser-item">
+        <strong>${escapeHtml(item.name || "Untitled draft")}</strong>
+        <p class="muted">${escapeHtml(item.useWhen || item.scenario || "No use-when summary yet.")}</p>
+        <p>${escapeHtml((item.outputFormat || item.goal || "").slice(0, 180) || "No output format summary yet.")}</p>
+      </article>
+    `),
+    renderBrowserList("Skills / 正式技能", skillItems, (item) => {
+      const variantCount = variantItems.filter((variant) => variant.baseSkillId === item.id).length;
+      return `
+        <article class="browser-item">
+          <strong>${escapeHtml(item.name || "Untitled skill")}</strong>
+          <p class="muted">${escapeHtml(item.useWhen || item.scenario || "No use-when summary yet.")}</p>
+          <p>${escapeHtml((item.successCriteria || item.outputFormat || "").slice(0, 180) || "No success criteria yet.")}</p>
+          <p class="muted">Variants / 变体: ${variantCount}</p>
+        </article>
+      `;
+    }),
+    renderBrowserList("Variants / 技能变体", variantItems, (item) => `
+      <article class="browser-item">
+        <strong>${escapeHtml(item.name || "Untitled variant")}</strong>
+        <p class="muted">${escapeHtml(item.baseSkillId ? `Base / 基础技能: ${item.baseSkillId}` : "No base skill linked.")}</p>
+        <p>${escapeHtml((item.goal || item.promptTemplate || "").slice(0, 180) || "No variant summary yet.")}</p>
+      </article>
+    `),
+    renderBrowserList("Archived / 已归档", archivedItems, (item) => `
+      <article class="browser-item">
+        <strong>${escapeHtml(item.name || item.title || "Archived item")}</strong>
+        <p class="muted">${escapeHtml(item.kind || "asset")}</p>
+      </article>
+    `)
+  ].join("");
+}
+
+function renderBrowserList(title, items, renderer) {
+  const content = items.length
+    ? items.map((item) => renderer(item)).join("")
+    : `<p class="muted">Nothing here yet.</p>`;
+
+  return `
+    <section class="browser-section">
+      <div class="status-line">
+        <span>${title}</span>
+        <strong>${items.length}</strong>
+      </div>
+      <div class="browser-list">${content}</div>
+    </section>
+  `;
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function populateSettings(settings) {
   const provider = document.querySelector("[data-setting='apiProvider']");
   const mode = document.querySelector("[data-setting='validationMode']");
   const apiBaseUrl = document.querySelector("[data-setting='apiBaseUrl']");
   const apiModel = document.querySelector("[data-setting='apiModel']");
   const apiKey = document.querySelector("[data-setting='apiKey']");
+  const autoCompileAfterCapture = document.querySelector("[data-setting='autoCompileAfterCapture']");
+  const openWorkspaceAfterCapture = document.querySelector("[data-setting='openWorkspaceAfterCapture']");
 
   if (provider) {
     provider.value = settings.apiProvider || "custom";
@@ -68,11 +167,17 @@ function populateSettings(settings) {
   if (apiKey) {
     apiKey.value = settings.apiKey || "";
   }
+  if (autoCompileAfterCapture) {
+    autoCompileAfterCapture.checked = settings.autoCompileAfterCapture !== false;
+  }
+  if (openWorkspaceAfterCapture) {
+    openWorkspaceAfterCapture.checked = settings.openWorkspaceAfterCapture !== false;
+  }
 }
 
 async function renderActiveTabStatus() {
   const tabs = await chrome.tabs.query({ currentWindow: true });
-  const tab = pickBestExternalTab(tabs);
+  const tab = pickBestSupportedTab(tabs) || pickBestExternalTab(tabs);
   const activeTabNode = document.querySelector("[data-active-tab]");
   const platformNode = document.querySelector("[data-platform-status]");
 
@@ -95,8 +200,25 @@ function pickBestExternalTab(tabs) {
   return externalTabs[0] || null;
 }
 
+function pickBestSupportedTab(tabs) {
+  return tabs
+    .filter((tab) => {
+      if (!tab.url) {
+        return false;
+      }
+      try {
+        const url = new URL(tab.url);
+        return SUPPORTED_HOSTS.includes(url.hostname);
+      } catch (error) {
+        return false;
+      }
+    })
+    .sort((left, right) => (right.lastAccessed || 0) - (left.lastAccessed || 0))[0] || null;
+}
+
 async function withActiveTab(callback) {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const tabs = await chrome.tabs.query({ currentWindow: true });
+  const tab = pickBestSupportedTab(tabs) || pickBestExternalTab(tabs);
   if (!tab?.id) {
     setFeedback("No active tab found.");
     return;
@@ -138,7 +260,9 @@ function collectSettingsFromForm() {
     apiProvider: provider,
     apiBaseUrl: resolvedBaseUrl,
     apiModel: modelInput?.value.trim() || "",
-    apiKey: keyInput?.value.trim() || ""
+    apiKey: keyInput?.value.trim() || "",
+    autoCompileAfterCapture: document.querySelector("[data-setting='autoCompileAfterCapture']")?.checked ?? true,
+    openWorkspaceAfterCapture: document.querySelector("[data-setting='openWorkspaceAfterCapture']")?.checked ?? true
   };
 }
 

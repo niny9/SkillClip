@@ -92,11 +92,19 @@ function renderVariants(selector, variants, skills) {
 }
 
 function renderConversation(item) {
+  const hasAutoPreview = latestState?.drafts?.some((draft) => (
+    (draft.status === "preview" || draft.status === "draft")
+      && (draft.sourceConversationIds || []).includes(item.id)
+  ));
   return `
     <article class="list-card">
       <strong>${escapeHtml(item.selectedText || item.sourceTitle || "Captured conversation")}</strong>
       <span>Source / 来源: ${escapeHtml(item.sourcePlatform || "other")} · Mode / 方式: ${escapeHtml(item.captureMode)}</span>
+      <div class="meta-block">
+        <small>${hasAutoPreview ? "A preview already exists for this source. / 这条素材已经生成过预览。" : "Next step / 下一步: compile this source into a preview."}</small>
+      </div>
       <div class="action-row">
+        <button type="button" data-action="compile-conversation" data-id="${item.id}">Compile to Preview / 编译为预览</button>
         <button type="button" data-action="archive-conversation" data-id="${item.id}">Archive</button>
       </div>
     </article>
@@ -168,10 +176,20 @@ function renderArchivedItem(item) {
     skill: "Skill / 正式技能"
   };
 
+  const restoreAction = item.archiveKind === "conversation"
+    ? "restore-conversation"
+    : item.archiveKind === "draft"
+      ? "restore-draft"
+      : "restore-skill";
+  const restoreId = item.id;
+
   return `
     <article class="list-card">
       <strong>${escapeHtml(item.name || item.selectedText || item.sourceTitle || "Archived item")}</strong>
       <span>Archived / 已归档 · ${escapeHtml(kindMap[item.archiveKind] || item.archiveKind || "item")}</span>
+      <div class="action-row">
+        <button type="button" data-action="${restoreAction}" data-id="${restoreId}">Restore / 恢复</button>
+      </div>
     </article>
   `;
 }
@@ -396,6 +414,12 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
+  if (action === "compile-conversation" && id) {
+    await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.COMPILE_CONVERSATION, payload: { conversationId: id } });
+    setFeedback("Inbox item compiled into preview.");
+    return;
+  }
+
   if (action === "archive-draft" && id) {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.ARCHIVE_DRAFT, payload: { draftId: id } });
     return;
@@ -403,6 +427,24 @@ document.addEventListener("click", async (event) => {
 
   if (action === "archive-skill" && id) {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.ARCHIVE_SKILL, payload: { skillId: id } });
+    return;
+  }
+
+  if (action === "restore-conversation" && id) {
+    await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.RESTORE_CONVERSATION, payload: { conversationId: id } });
+    setFeedback("Conversation restored to Inbox.");
+    return;
+  }
+
+  if (action === "restore-draft" && id) {
+    await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.RESTORE_DRAFT, payload: { draftId: id } });
+    setFeedback("Draft restored.");
+    return;
+  }
+
+  if (action === "restore-skill" && id) {
+    await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.RESTORE_SKILL, payload: { skillId: id } });
+    setFeedback("Skill restored.");
     return;
   }
 

@@ -131,26 +131,42 @@
           <span>API Key / 密钥</span>
           <input data-setting="apiKey" type="password" placeholder="Stored locally in this prototype" />
         </label>
+        <label class="field-label">
+          <span>
+            <input data-setting="autoCompileAfterCapture" type="checkbox" />
+            Auto compile after saving prompt or flow / 保存后自动生成编译预览
+          </span>
+        </label>
+        <label class="field-label">
+          <span>
+            <input data-setting="openWorkspaceAfterCapture" type="checkbox" />
+            Open workspace after capture / 保存后自动打开工作台
+          </span>
+        </label>
         <div class="action-row">
           <button type="button" data-action="test-api">Test API Connection / 测试接口连通</button>
           <button type="button" data-action="save-settings">Save Validation Settings / 保存校验设置</button>
         </div>
         <p class="muted" data-settings-feedback>
-          Local mode works now. API mode is scaffolded, but full remote validation still needs endpoint permission strategy.
+          Validation runs during preview generation, draft editing, and promotion to formal skill.
         </p>
       </section>
 
       <section class="card">
-        <h2>Local Data Export</h2>
+        <h2>Local Assets / 本地资产</h2>
         <p class="muted">
-          Export your current local-first state as JSON for inspection or backup.
+          Browse your saved items by stage instead of reading raw JSON. Use JSON only when you need backup or debugging.
         </p>
         <div class="action-row">
           <button type="button" data-action="refresh-state">Refresh Snapshot</button>
           <button type="button" data-action="copy-json">Copy JSON</button>
           <button type="button" data-action="download-json">Download JSON</button>
         </div>
-        <textarea data-json-output class="code-area" spellcheck="false"></textarea>
+        <div class="asset-browser" data-asset-browser></div>
+        <details class="raw-json-wrap">
+          <summary>Raw JSON / 原始数据</summary>
+          <textarea data-json-output class="code-area" spellcheck="false"></textarea>
+        </details>
       </section>
 
       <section class="card">

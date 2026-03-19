@@ -241,6 +241,42 @@ p {
   line-height: 1.45;
 }
 
+.asset-browser {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+
+.browser-section {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.browser-list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.browser-item {
+  border: 1px solid rgba(214, 203, 184, 0.9);
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 18px;
+  padding: 0.85rem 0.95rem;
+}
+
+.browser-item p {
+  margin: 0.35rem 0 0;
+}
+
+.raw-json-wrap {
+  margin-top: 1rem;
+}
+
+.raw-json-wrap summary {
+  cursor: pointer;
+  color: var(--accent);
+}
+
 .detail-panel {
   position: sticky;
   top: 1rem;

@@ -18,6 +18,9 @@ import {
   insertVariant,
   removeDraft,
   resetAllState,
+  restoreConversation,
+  restoreDraft,
+  restoreSkill,
   seedDemoSkillIfNeeded,
   updateSettings,
   updateDraft,
@@ -25,7 +28,6 @@ import {
 } from "../lib/storage.js";
 
 chrome.runtime.onInstalled.addListener(async () => {
-  await seedDemoSkillIfNeeded();
   await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
 });
 
@@ -62,11 +64,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function handleMessage(message, sender) {
   switch (message.type) {
     case MESSAGE_TYPES.SAVE_PROMPT:
-      return saveConversationMemory(message.payload, "selection");
+      return saveCapturedItem(message.payload, "selection");
     case MESSAGE_TYPES.SAVE_FLOW:
-      return saveConversationMemory(message.payload, "whole_flow");
+      return saveCapturedItem(message.payload, "whole_flow");
     case MESSAGE_TYPES.COMPILE_SKILL:
       return compileConversationToDraft(message.payload);
+    case MESSAGE_TYPES.COMPILE_CONVERSATION:
+      return compileStoredConversation(message.payload.conversationId);
     case MESSAGE_TYPES.GET_STATE:
       return getAllState();
     case MESSAGE_TYPES.INSERT_SKILL:
@@ -83,6 +87,12 @@ async function handleMessage(message, sender) {
       return archiveDraftItem(message.payload.draftId);
     case MESSAGE_TYPES.ARCHIVE_SKILL:
       return archiveSkillItem(message.payload.skillId);
+    case MESSAGE_TYPES.RESTORE_CONVERSATION:
+      return restoreConversationItem(message.payload.conversationId);
+    case MESSAGE_TYPES.RESTORE_DRAFT:
+      return restoreDraftItem(message.payload.draftId);
+    case MESSAGE_TYPES.RESTORE_SKILL:
+      return restoreSkillItem(message.payload.skillId);
     case MESSAGE_TYPES.UPDATE_DRAFT:
       return updateDraftItem(message.payload);
     case MESSAGE_TYPES.UPDATE_SKILL:
@@ -132,27 +142,40 @@ async function saveConversationMemory(payload, captureMode) {
   return item;
 }
 
+async function saveCapturedItem(payload, captureMode) {
+  const settings = await getSettings();
+  const memory = await saveConversationMemory(payload, captureMode);
+
+  let preview = null;
+  if (settings.autoCompileAfterCapture) {
+    preview = await compileFromExistingMemory(memory, payload, settings);
+  }
+
+  return { memory, preview };
+}
+
 async function compileConversationToDraft(payload) {
   const settings = await getSettings();
   const memory = await saveConversationMemory(payload, "recent_turns");
-  let draft = compileSkillDraft({
-    ...payload,
-    conversationId: memory.id
-  }, settings);
+  return compileFromExistingMemory(memory, payload, settings);
+}
 
-  if (settings.validationMode === "api") {
-    draft = await extractSkillDraftWithApi({
-      ...payload,
-      conversationId: memory.id
-    }, draft, settings);
+async function compileStoredConversation(conversationId) {
+  const state = await getAllState();
+  const source = state.conversations.find((item) => item.id === conversationId);
+  if (!source) {
+    throw new Error("Conversation not found");
   }
 
-  draft = await applyApiValidationIfNeeded(draft, settings);
-
-  await insertDraft(draft);
-  await broadcastStorageUpdate();
-
-  return draft;
+  const settings = await getSettings();
+  return compileFromExistingMemory(source, {
+    platform: source.sourcePlatform,
+    url: source.sourceUrl,
+    title: source.sourceTitle,
+    model: source.sourceModel,
+    selectedText: source.selectedText || source.turns?.[0]?.text || "",
+    turns: source.turns || []
+  }, settings);
 }
 
 async function promoteDraft(draftId) {
@@ -227,6 +250,24 @@ async function archiveSkillItem(skillId) {
   return item;
 }
 
+async function restoreConversationItem(conversationId) {
+  const item = await restoreConversation(conversationId);
+  await broadcastStorageUpdate();
+  return item;
+}
+
+async function restoreDraftItem(draftId) {
+  const item = await restoreDraft(draftId);
+  await broadcastStorageUpdate();
+  return item;
+}
+
+async function restoreSkillItem(skillId) {
+  const item = await restoreSkill(skillId);
+  await broadcastStorageUpdate();
+  return item;
+}
+
 async function updateDraftItem(payload) {
   const settings = await getSettings();
   const baseDraft = await findDraftById(payload.id);
@@ -289,7 +330,6 @@ async function updateSkillItem(payload) {
 
 async function resetState() {
   await resetAllState();
-  await seedDemoSkillIfNeeded();
   await broadcastStorageUpdate();
   return { ok: true };
 }
@@ -324,6 +364,25 @@ async function ensureContentScriptForTab(tabId) {
   }
 
   return ensureContentScript(tabId);
+}
+
+async function compileFromExistingMemory(memory, payload, settings) {
+  let draft = compileSkillDraft({
+    ...payload,
+    conversationId: memory.id
+  }, settings);
+
+  if (settings.validationMode === "api") {
+    draft = await extractSkillDraftWithApi({
+      ...payload,
+      conversationId: memory.id
+    }, draft, settings);
+  }
+
+  draft = await applyApiValidationIfNeeded(draft, settings);
+  await insertDraft(draft);
+  await broadcastStorageUpdate();
+  return draft;
 }
 
 async function broadcastStorageUpdate() {
