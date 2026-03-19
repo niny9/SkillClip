@@ -9,6 +9,24 @@ async function setBucket(key, value) {
   await chrome.storage.local.set({ [key]: value });
 }
 
+export async function getSettings() {
+  const result = await chrome.storage.local.get([STORAGE_KEYS.SETTINGS]);
+  return {
+    validationMode: "local",
+    apiBaseUrl: "",
+    apiModel: "",
+    apiKey: "",
+    ...(result[STORAGE_KEYS.SETTINGS] || {})
+  };
+}
+
+export async function updateSettings(nextSettings) {
+  const current = await getSettings();
+  const merged = { ...current, ...nextSettings };
+  await setBucket(STORAGE_KEYS.SETTINGS, merged);
+  return merged;
+}
+
 export async function getAllState() {
   const result = await chrome.storage.local.get([
     STORAGE_KEYS.CONVERSATIONS,
@@ -23,7 +41,13 @@ export async function getAllState() {
     drafts: result[STORAGE_KEYS.DRAFTS] || [],
     skills: result[STORAGE_KEYS.SKILLS] || [],
     variants: result[STORAGE_KEYS.VARIANTS] || [],
-    settings: result[STORAGE_KEYS.SETTINGS] || {}
+    settings: {
+      validationMode: "local",
+      apiBaseUrl: "",
+      apiModel: "",
+      apiKey: "",
+      ...(result[STORAGE_KEYS.SETTINGS] || {})
+    }
   };
 }
 

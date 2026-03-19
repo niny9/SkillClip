@@ -20,6 +20,7 @@ export const MESSAGE_TYPES = {
   ARCHIVE_SKILL: "skillclip/archive-skill",
   UPDATE_DRAFT: "skillclip/update-draft",
   UPDATE_SKILL: "skillclip/update-skill",
+  UPDATE_SETTINGS: "skillclip/update-settings",
   RESET_STATE: "skillclip/reset-state",
   SEED_DEMO: "skillclip/seed-demo",
   ENSURE_CONTENT_SCRIPT: "skillclip/ensure-content-script",
