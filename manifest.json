@@ -1,0 +1,70 @@
+{
+  "manifest_version": 3,
+  "name": "SkillClip",
+  "short_name": "SkillClip",
+  "version": "0.1.0",
+  "description": "Turn AI chats into reusable skills.",
+  "minimum_chrome_version": "114",
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab",
+    "tabs",
+    "sidePanel"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://www.perplexity.ai/*",
+    "https://chat.deepseek.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "SkillClip",
+    "default_popup": "src/pages/popup/popup.html"
+  },
+  "options_page": "src/pages/options/options.html",
+  "side_panel": {
+    "default_path": "src/pages/sidepanel/sidepanel.html"
+  },
+  "commands": {
+    "open-skillclip-action-bar": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+K",
+        "mac": "Command+Shift+K"
+      },
+      "description": "Open the SkillClip action bar"
+    },
+    "open-skill-palette": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+L",
+        "mac": "Command+Shift+L"
+      },
+      "description": "Open the SkillClip skill palette"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://www.perplexity.ai/*",
+        "https://chat.deepseek.com/*"
+      ],
+      "js": [
+        "src/content/content-script.js"
+      ],
+      "css": [
+        "src/styles/content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

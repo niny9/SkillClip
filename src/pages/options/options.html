@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SkillClip Control Center</title>
+    <link rel="stylesheet" href="../shared/ui.css" />
+  </head>
+  <body>
+    <main class="page-shell page-shell-dashboard">
+      <section class="hero-card">
+        <div>
+          <p class="eyebrow">Control Center</p>
+          <h1>SkillClip Setup and Debug</h1>
+          <p class="lede">
+            Use this page to learn the flow, test the extension on the current tab,
+            inspect local data, and prepare for Chrome Web Store deployment.
+          </p>
+        </div>
+        <div class="hero-actions">
+          <button type="button" data-action="open-sidepanel">Open Workspace</button>
+          <button type="button" data-action="seed-demo">Seed Demo Skill</button>
+          <button type="button" data-action="reset-state" class="danger-button">Reset Local Data</button>
+        </div>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="card">
+          <h2>Current Status</h2>
+          <div class="stack compact-stack">
+            <div class="status-line">
+              <span>Target page / 当前目标页</span>
+              <strong data-active-tab>Checking...</strong>
+            </div>
+            <div class="status-line">
+              <span>Platform support / 平台支持</span>
+              <strong data-platform-status>Checking...</strong>
+            </div>
+            <div class="status-line">
+              <span>Inbox raw captures / 待整理素材</span>
+              <strong data-count="conversations">0</strong>
+            </div>
+            <div class="status-line">
+              <span>Skill drafts / 技能草稿</span>
+              <strong data-count="drafts">0</strong>
+            </div>
+            <div class="status-line">
+              <span>Validated skills / 正式技能</span>
+              <strong data-count="skills">0</strong>
+            </div>
+            <div class="status-line">
+              <span>Variants / 技能变体</span>
+              <strong data-count="variants">0</strong>
+            </div>
+            <div class="status-line">
+              <span>Archived items / 已归档</span>
+              <strong data-count="archived">0</strong>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Quick Test</h2>
+          <div class="stack compact-stack">
+            <button type="button" data-action="open-actionbar">Open Action Bar On Active Tab</button>
+            <button type="button" data-action="open-palette">Open Skill Palette On Active Tab</button>
+          </div>
+          <p class="muted" data-action-feedback>
+            Start on a supported AI page, then trigger the in-page UI from here.
+          </p>
+        </article>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="card">
+          <h2>How To Use / 如何使用</h2>
+          <div class="checklist">
+            <p>1. Inbox / 待整理素材：先存原始 prompt 或最近对话。</p>
+            <p>2. Draft / 技能草稿：系统把原始内容整理成草稿。</p>
+            <p>3. Skill / 正式技能：你确认后，草稿升级成可复用技能。</p>
+            <p>4. Variant / 技能变体：在原有 skill 基础上分叉出新版本。</p>
+            <p>5. Archive / 归档：不会删除，只是移到归档区。</p>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Debug Checklist</h2>
+          <div class="checklist">
+            <p>1. If buttons do nothing, refresh the AI page after reloading the extension.</p>
+            <p>2. If capture is empty, make sure the page is one of the supported AI domains.</p>
+            <p>3. If voice fails, check Chrome speech permissions and browser support.</p>
+            <p>4. Open the service worker console from `chrome://extensions` for runtime errors.</p>
+          </div>
+        </article>
+      </section>
+
+      <section class="card">
+        <h2>Local Data Export</h2>
+        <p class="muted">
+          Export your current local-first state as JSON for inspection or backup.
+        </p>
+        <div class="action-row">
+          <button type="button" data-action="refresh-state">Refresh Snapshot</button>
+          <button type="button" data-action="copy-json">Copy JSON</button>
+          <button type="button" data-action="download-json">Download JSON</button>
+        </div>
+        <textarea data-json-output class="code-area" spellcheck="false"></textarea>
+      </section>
+
+      <section class="card">
+        <h2>Deployment Path</h2>
+        <div class="checklist">
+          <p>1. Add final icons and screenshots.</p>
+          <p>2. Publish a public privacy policy page.</p>
+          <p>3. Test each supported AI site in Chrome.</p>
+          <p>4. Zip the extension root for release packaging.</p>
+          <p>5. Submit to Chrome Web Store with the privacy disclosures.</p>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="./options.js"></script>
+  </body>
+  </html>

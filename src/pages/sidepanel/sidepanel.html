@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SkillClip Workspace</title>
+    <link rel="stylesheet" href="../shared/ui.css" />
+  </head>
+  <body>
+    <main class="page-shell page-shell-workspace">
+      <section>
+        <p class="eyebrow">Workspace</p>
+        <h1>Workspace / 工作台</h1>
+        <p class="lede">Inbox 是原始素材，Draft 是技能草稿，Skill 是正式可复用技能，Variant 是技能分支版本。</p>
+
+        <section class="card">
+          <h2>Quick Actions / 快捷操作</h2>
+          <div class="action-row">
+            <button type="button" data-action="open-actionbar">Open Action Bar / 打开操作条</button>
+            <button type="button" data-action="open-palette">Open Skill Palette / 打开技能面板</button>
+            <button type="button" data-action="open-control-center">Open Control Center / 打开控制中心</button>
+            <button type="button" data-action="refresh-workspace">Refresh / 刷新</button>
+          </div>
+          <p class="muted" data-feedback>
+            Open an AI page, then use these buttons to trigger the in-page tools.
+          </p>
+        </section>
+
+        <section class="card">
+          <h2>Inbox / 待整理素材</h2>
+          <div data-inbox class="stack"></div>
+        </section>
+
+        <section class="card">
+          <h2>Skill Drafts / 技能草稿</h2>
+          <div data-drafts class="stack"></div>
+        </section>
+
+        <section class="card">
+          <h2>Validated Skills / 正式技能</h2>
+          <div data-skills class="stack"></div>
+        </section>
+
+        <section class="card">
+          <h2>Variants / 技能变体</h2>
+          <div data-variants class="stack"></div>
+        </section>
+
+        <section class="card">
+          <h2>Archived / 已归档</h2>
+          <div data-archived class="stack"></div>
+        </section>
+      </section>
+
+      <aside class="card detail-panel">
+        <h2>Details / 详情编辑</h2>
+        <p class="muted" data-detail-empty>
+          Click a draft or skill card to inspect and edit it here.
+        </p>
+        <form data-detail-form hidden>
+          <input type="hidden" name="id" />
+          <input type="hidden" name="kind" />
+
+          <label class="field-label">
+            <span>Name / 名称</span>
+            <input name="name" type="text" />
+          </label>
+
+          <label class="field-label">
+            <span>Scenario / 使用场景</span>
+            <input name="scenario" type="text" />
+          </label>
+
+          <label class="field-label">
+            <span>Goal / 目标</span>
+            <textarea name="goal" rows="3"></textarea>
+          </label>
+
+          <label class="field-label">
+            <span>Prompt Template / 提示词模板</span>
+            <textarea name="promptTemplate" rows="8"></textarea>
+          </label>
+
+          <label class="field-label">
+            <span>Steps / 步骤（每行一步）</span>
+            <textarea name="steps" rows="6"></textarea>
+          </label>
+
+          <div class="action-row">
+            <button type="submit">Save Changes / 保存修改</button>
+            <button type="button" data-action="clear-detail">Close / 关闭</button>
+          </div>
+        </form>
+
+        <section class="detail-source-block" data-source-panel hidden>
+          <h3>Source Preview / 来源预览</h3>
+          <div data-source-content class="stack"></div>
+        </section>
+      </aside>
+    </main>
+    <script type="module" src="./sidepanel.js"></script>
+  </body>
+  </html>

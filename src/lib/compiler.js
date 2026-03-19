@@ -1,0 +1,153 @@
+import { createId, dedupe, nowIso, slugify, titleFromText } from "./utils.js";
+
+function extractVariablesFromText(text) {
+  const matches = text.match(/\{[a-zA-Z0-9_]+\}|\[[^\]]+\]|"[^"]+"|'[^']+'/g) || [];
+  const inferred = matches
+    .map((match) => match.replace(/[{}[\]"']/g, "").trim())
+    .filter(Boolean)
+    .slice(0, 5);
+
+  return dedupe(inferred).map((key) => ({
+    key: key.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+    label: key,
+    required: true,
+    description: "Inferred variable from the captured conversation"
+  }));
+}
+
+function inferScenario({ platform, selectedText, turns, title }) {
+  const base = [selectedText, title, ...(turns || []).map((turn) => turn.text)]
+    .join(" ")
+    .toLowerCase();
+
+  if (base.includes("sql")) {
+    return "SQL debugging";
+  }
+  if (base.includes("prd") || base.includes("product requirement")) {
+    return "Product PRD writing";
+  }
+  if (base.includes("title") || base.includes("xiaohongshu")) {
+    return "Marketing copy generation";
+  }
+  if (platform === "claude" || platform === "chatgpt") {
+    return "General AI workflow";
+  }
+
+  return "Reusable AI workflow";
+}
+
+function inferSteps(turns) {
+  const userTurns = (turns || []).filter((turn) => turn.role === "user").slice(0, 4);
+  const assistantTurns = (turns || []).filter((turn) => turn.role === "assistant").slice(0, 3);
+  const steps = [];
+
+  userTurns.forEach((turn, index) => {
+    steps.push(`Capture user requirement ${index + 1}: ${titleFromText(turn.text, "User request")}`);
+  });
+
+  assistantTurns.forEach((turn, index) => {
+    steps.push(`Apply AI response pattern ${index + 1}: ${titleFromText(turn.text, "Assistant response")}`);
+  });
+
+  if (steps.length === 0) {
+    steps.push("Describe the task clearly");
+    steps.push("Provide constraints, context, and desired output");
+    steps.push("Ask for a structured answer");
+  }
+
+  return steps;
+}
+
+export function compileSkillDraft(payload) {
+  const selectedText = payload.selectedText || payload.turns?.[0]?.text || "";
+  const name = titleFromText(selectedText, payload.title || "Untitled Skill Draft");
+  const scenario = inferScenario(payload);
+  const inputs = extractVariablesFromText(selectedText);
+  const steps = inferSteps(payload.turns);
+
+  return {
+    id: createId("draft"),
+    kind: "skill_draft",
+    status: "draft",
+    name,
+    scenario,
+    goal: `Reuse a proven workflow from ${payload.platform || "an AI tool"}`,
+    userIntent: titleFromText(selectedText, "Reuse this AI workflow"),
+    inputs,
+    constraints: [
+      "Preserve the original task intent",
+      "Keep the output reusable across AI tools"
+    ],
+    steps,
+    promptTemplate: buildPromptTemplate(selectedText, inputs),
+    outputFormat: "Structured response",
+    example: selectedText,
+    sourceConversationIds: [payload.conversationId],
+    createdAt: nowIso(),
+    updatedAt: nowIso()
+  };
+}
+
+function buildPromptTemplate(selectedText, inputs) {
+  if (!selectedText) {
+    return "Help me apply this skill to {{topic}} with a clear structured output.";
+  }
+
+  let template = selectedText;
+  inputs.forEach((input) => {
+    const pattern = new RegExp(input.label, "ig");
+    template = template.replace(pattern, `{{${input.key}}}`);
+  });
+
+  if (inputs.length === 0) {
+    template += "\n\nReturn the result in a clear, structured format.";
+  }
+
+  return template;
+}
+
+export function promoteDraftToSkill(draft) {
+  return {
+    id: createId("skill"),
+    kind: "skill",
+    status: "validated",
+    name: draft.name,
+    slug: slugify(draft.name),
+    scenario: draft.scenario,
+    goal: draft.goal,
+    userIntent: draft.userIntent,
+    inputs: draft.inputs,
+    constraints: draft.constraints,
+    steps: draft.steps,
+    promptTemplate: draft.promptTemplate,
+    outputFormat: draft.outputFormat,
+    example: draft.example,
+    tags: [],
+    sourceConversationIds: draft.sourceConversationIds,
+    preferredForPlatforms: [],
+    preferredForModels: [],
+    usageCount: 0,
+    createdAt: nowIso(),
+    updatedAt: nowIso()
+  };
+}
+
+export function createVariantFromSkill(skill) {
+  return {
+    id: createId("variant"),
+    kind: "skill_variant",
+    baseSkillId: skill.baseSkillId || skill.id,
+    name: `${skill.name} Variant`,
+    changeSummary: "Forked from validated skill for further iteration",
+    scenarioOverride: skill.scenario,
+    promptTemplate: skill.promptTemplate,
+    constraints: skill.constraints,
+    steps: skill.steps,
+    preferredForPlatforms: skill.preferredForPlatforms || [],
+    preferredForModels: skill.preferredForModels || [],
+    usageCount: 0,
+    successSignals: [],
+    createdAt: nowIso(),
+    updatedAt: nowIso()
+  };
+}

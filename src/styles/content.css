@@ -1,0 +1,159 @@
+:root {
+  --skillclip-bg: rgba(255, 251, 244, 0.96);
+  --skillclip-ink: #1f1d19;
+  --skillclip-muted: #635b50;
+  --skillclip-line: #d9cfbf;
+  --skillclip-accent: #146356;
+  --skillclip-accent-soft: #d7efe8;
+  --skillclip-shadow: 0 22px 48px rgba(40, 31, 13, 0.18);
+}
+
+.skillclip-panel,
+.skillclip-toast {
+  position: fixed;
+  z-index: 2147483646;
+  border: 1px solid var(--skillclip-line);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at top right, rgba(247, 196, 117, 0.22), transparent 30%),
+    var(--skillclip-bg);
+  color: var(--skillclip-ink);
+  box-shadow: var(--skillclip-shadow);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px);
+  transition: opacity 160ms ease, transform 160ms ease;
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
+}
+
+.skillclip-panel {
+  top: 20px;
+  left: 20px;
+  right: auto;
+  width: min(360px, calc(100vw - 40px));
+  padding: 1rem;
+}
+
+.skillclip-toast {
+  bottom: 20px;
+  left: 20px;
+  right: auto;
+  padding: 0.9rem 1rem;
+}
+
+.skillclip-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.skillclip-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.skillclip-panel-header strong {
+  font-size: 1rem;
+}
+
+.skillclip-panel-meta {
+  margin: 0.15rem 0 0;
+  color: var(--skillclip-muted);
+  font-size: 0.82rem;
+}
+
+.skillclip-panel-header button,
+.skillclip-panel-body button,
+.skillclip-panel-body input {
+  font: inherit;
+}
+
+.skillclip-panel-header button,
+.skillclip-panel-body button {
+  cursor: pointer;
+  border: 1px solid var(--skillclip-line);
+  border-radius: 14px;
+  background: white;
+  color: var(--skillclip-ink);
+}
+
+.skillclip-panel-header button {
+  padding: 0.4rem 0.65rem;
+}
+
+.skillclip-panel-body {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+
+.skillclip-panel-body > button,
+.skillclip-skill-item {
+  width: 100%;
+  padding: 0.9rem 1rem;
+  text-align: left;
+}
+
+.skillclip-panel-body > button:hover,
+.skillclip-skill-item:hover {
+  border-color: var(--skillclip-accent);
+  background: var(--skillclip-accent-soft);
+}
+
+.skillclip-panel-body input {
+  width: 100%;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid var(--skillclip-line);
+  border-radius: 14px;
+}
+
+.skillclip-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.skillclip-skill-item {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.skillclip-skill-item small,
+.skillclip-empty {
+  color: var(--skillclip-muted);
+}
+
+.skillclip-voice-status {
+  margin: 0;
+  padding: 0 0.1rem;
+  color: var(--skillclip-muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.skillclip-voice-actions {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.35rem;
+  padding: 0.8rem;
+  border: 1px solid var(--skillclip-line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.skillclip-voice-hint {
+  margin: 0;
+  color: var(--skillclip-muted);
+  font-size: 0.82rem;
+}
+
+.skillclip-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.skillclip-inline-actions button {
+  flex: 1 1 150px;
+}

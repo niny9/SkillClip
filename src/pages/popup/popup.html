@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SkillClip</title>
+    <link rel="stylesheet" href="../shared/ui.css" />
+  </head>
+  <body>
+    <main class="page-shell">
+      <p class="eyebrow">SkillClip</p>
+      <h1>AI Skill Compiler</h1>
+      <p class="lede">Capture prompts, compile workflows, reuse anywhere.</p>
+
+      <section class="stats-grid">
+        <article class="stat-card">
+          <span>Inbox</span>
+          <strong data-count="conversations">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Drafts</span>
+          <strong data-count="drafts">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Skills</span>
+          <strong data-count="skills">0</strong>
+        </article>
+      </section>
+
+      <section class="card">
+        <h2>Quick Actions</h2>
+        <div class="stack compact-stack">
+          <button type="button" data-action="open-sidepanel">Open Workspace</button>
+          <button type="button" data-action="open-options">Open Control Center</button>
+          <button type="button" data-action="open-actionbar">Open Action Bar On This Tab</button>
+          <button type="button" data-action="open-palette">Open Skill Palette On This Tab</button>
+        </div>
+        <p class="muted" data-feedback>
+          Use these on a supported AI page. The in-page panel now opens on the left side.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>How To Start</h2>
+        <div class="checklist">
+          <p>1. Open ChatGPT, Claude, Gemini, DeepSeek, or Perplexity.</p>
+          <p>2. Click “Open Action Bar On This Tab”.</p>
+          <p>3. Save a prompt or compile a draft skill.</p>
+          <p>4. Open Workspace to review and promote it.</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Recent Skills</h2>
+        <div data-recent-skills class="stack"></div>
+      </section>
+    </main>
+    <script type="module" src="./popup.js"></script>
+  </body>
+  </html>
