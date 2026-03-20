@@ -9,8 +9,9 @@ async function load() {
   latestState = state;
 
   const activeConversations = state.conversations.filter((item) => !item.archivedAt);
-  const previewDrafts = state.drafts.filter((item) => item.status === "preview");
-  const activeDrafts = state.drafts.filter((item) => item.status === "draft");
+  const previewDrafts = state.drafts.filter((item) => item.status === "preview").map((item) => ({ ...item, uiStage: "preview" }));
+  const activeDrafts = state.drafts.filter((item) => item.status === "draft").map((item) => ({ ...item, uiStage: "draft" }));
+  const inProgressItems = [...previewDrafts, ...activeDrafts];
   const activeSkills = state.skills.filter((item) => item.status !== "archived");
   const archivedItems = [
     ...state.conversations.filter((item) => item.archivedAt).map((item) => ({ ...item, archiveKind: "conversation" })),
@@ -19,8 +20,7 @@ async function load() {
   ];
 
   renderList("[data-inbox]", activeConversations, renderConversation);
-  renderList("[data-previews]", previewDrafts, renderPreviewDraft);
-  renderList("[data-drafts]", activeDrafts, renderDraft);
+  renderList("[data-in-progress]", inProgressItems, renderInProgressItem);
   renderSkills("[data-skills]", activeSkills, state.variants);
   renderVariants("[data-variants]", state.variants, state.skills);
   renderList("[data-archived]", archivedItems, renderArchivedItem);
@@ -113,31 +113,23 @@ function renderConversation(item) {
   `;
 }
 
-function renderDraft(item) {
+function renderInProgressItem(item) {
+  const stageLine = item.uiStage === "preview"
+    ? "Preview / 系统刚生成，等你确认"
+    : "Draft / 你已确认，可继续编辑";
+  const primaryButton = item.uiStage === "preview"
+    ? `<button type="button" data-action="approve-preview" data-id="${item.id}">Save as Draft / 保存为草稿</button>`
+    : `<button type="button" data-action="promote-draft" data-id="${item.id}">Promote to Skill / 升级成技能</button>`;
   return `
     <article class="list-card clickable-card" data-detail-kind="draft" data-detail-id="${item.id}">
       <strong>${escapeHtml(item.name)}</strong>
-      <span>Draft / 草稿 · ${escapeHtml(item.scenario || "Draft skill")}</span>
-      <div class="action-row">
-        <button type="button" data-action="promote-draft" data-id="${item.id}">Promote to Skill</button>
-        <button type="button" data-action="archive-draft" data-id="${item.id}">Archive</button>
-        <button type="button" data-action="delete-draft" data-id="${item.id}">Delete / 删除</button>
-      </div>
-    </article>
-  `;
-}
-
-function renderPreviewDraft(item) {
-  return `
-    <article class="list-card clickable-card" data-detail-kind="draft" data-detail-id="${item.id}">
-      <strong>${escapeHtml(item.name)}</strong>
-      <span>Preview / 编译预览 · ${escapeHtml(item.scenario || "Skill preview")}</span>
+      <span>${escapeHtml(stageLine)} · ${escapeHtml(item.scenario || "Skill in progress")}</span>
       <div class="meta-block">
-        <small>Review this result before saving it as a draft.</small>
+        <small>${escapeHtml(item.useWhen || "Review and refine this skill before making it reusable.")}</small>
       </div>
       <div class="action-row">
-        <button type="button" data-action="approve-preview" data-id="${item.id}">Save as Draft / 保存为草稿</button>
-        <button type="button" data-action="archive-draft" data-id="${item.id}">Dismiss / 归档</button>
+        ${primaryButton}
+        <button type="button" data-action="archive-draft" data-id="${item.id}">${item.uiStage === "preview" ? "Dismiss / 归档" : "Archive / 归档"}</button>
         <button type="button" data-action="delete-draft" data-id="${item.id}">Delete / 删除</button>
       </div>
     </article>
@@ -148,13 +140,13 @@ function renderSkill(item, variantsForSkill = []) {
   return `
     <article class="list-card clickable-card" data-detail-kind="skill" data-detail-id="${item.id}">
       <strong>${escapeHtml(item.name)}</strong>
-      <span>Skill / 正式技能 · ${escapeHtml(item.scenario || "Reusable workflow")} · Used ${item.usageCount || 0} times</span>
+      <span>Ready Skill / 可复用技能 · ${escapeHtml(item.scenario || "Reusable workflow")} · Used ${item.usageCount || 0} times</span>
       <div class="meta-block">
         <small>Variants / 变体数: ${variantsForSkill.length}</small>
         ${variantsForSkill.length ? variantsForSkill.map((variant) => `<small>${escapeHtml(variant.name)}</small>`).join("") : "<small>No variants yet.</small>"}
       </div>
       <div class="action-row">
-        <button type="button" data-action="create-variant" data-id="${item.id}">New Variant</button>
+        <button type="button" data-action="create-variant" data-id="${item.id}">Create Alternative / 新建优化版</button>
         <button type="button" data-action="archive-skill" data-id="${item.id}">Archive</button>
         <button type="button" data-action="delete-skill" data-id="${item.id}">Delete / 删除</button>
       </div>
@@ -166,7 +158,7 @@ function renderVariant(item, baseSkill) {
   return `
     <article class="list-card clickable-card" data-detail-kind="variant" data-detail-id="${item.id}">
       <strong>${escapeHtml(item.name)}</strong>
-      <span>Variant / 技能变体 · For Skill / 所属技能: ${escapeHtml(baseSkill?.name || item.baseSkillId)}</span>
+      <span>Alternative / 优化版本 · For Skill / 所属技能: ${escapeHtml(baseSkill?.name || item.baseSkillId)}</span>
       <div class="meta-block">
         <small>${escapeHtml(item.changeSummary || "Variant")}</small>
       </div>
@@ -218,31 +210,22 @@ function showDetailPanel(item, kind) {
     title.textContent = `Selected / 当前选中: ${kindLabel} - ${item.name || item.id}`;
   }
 
-  if (kind === "variant") {
-    empty.hidden = false;
-    empty.textContent = "Variant details are visible as summary only for now. You can compare it in the list or delete it.";
-    form.hidden = true;
-    renderExtractionPreview(null);
-    renderValidationPreview(null);
-    renderSourcePreview({ sourceConversationIds: [] });
-    return;
-  }
-
   empty.hidden = true;
   form.hidden = false;
   form.elements.id.value = item.id || "";
   form.elements.kind.value = kind;
   form.elements.name.value = item.name || "";
-  form.elements.scenario.value = item.scenario || "";
+  form.elements.scenario.value = item.scenario || item.scenarioOverride || "";
   form.elements.useWhen.value = item.useWhen || "";
   form.elements.notFor.value = item.notFor || "";
-  form.elements.goal.value = item.goal || "";
+  form.elements.goal.value = item.goal || item.changeSummary || "";
   form.elements.promptTemplate.value = item.promptTemplate || "";
   form.elements.steps.value = (item.steps || []).join("\n");
   form.elements.outputFormat.value = item.outputFormat || "";
   form.elements.successCriteria.value = (item.successCriteria || []).join("\n");
   renderExtractionPreview(item.extraction);
-  renderValidationPreview(item.validation);
+  renderValidationPreview(kind === "variant" ? null : item.validation);
+  renderVariantCompare(item, kind);
   renderSourcePreview(item);
 }
 
@@ -255,6 +238,8 @@ function hideDetailPanel() {
   const extractionContent = document.querySelector("[data-extraction-content]");
   const validationPanel = document.querySelector("[data-validation-panel]");
   const validationContent = document.querySelector("[data-validation-content]");
+  const comparePanel = document.querySelector("[data-compare-panel]");
+  const compareContent = document.querySelector("[data-compare-content]");
   const title = document.querySelector("[data-detail-title]");
   if (!form || !empty) {
     return;
@@ -285,6 +270,12 @@ function hideDetailPanel() {
   }
   if (validationContent) {
     validationContent.innerHTML = "";
+  }
+  if (comparePanel) {
+    comparePanel.hidden = true;
+  }
+  if (compareContent) {
+    compareContent.innerHTML = "";
   }
 }
 
@@ -333,7 +324,7 @@ function renderValidationPreview(validation) {
 
   if (!validation) {
     panel.hidden = false;
-    content.innerHTML = "<p class='muted'>No validation result yet.</p>";
+    content.innerHTML = "<p class='muted'>This check runs automatically when a preview is generated, when you save edits, and when a draft is promoted to a reusable skill.</p>";
     return;
   }
 
@@ -351,8 +342,46 @@ function renderValidationPreview(validation) {
         ${validation.score != null ? `<strong class="validation-score">${escapeHtml(String(validation.score))}</strong>` : ""}
       </div>
       <p class="muted">${validation.checkedAt ? `Checked at / 检查时间: ${escapeHtml(validation.checkedAt)}` : "No timestamp yet."}</p>
+      <p class="muted">Runs automatically on preview generation, save, and promote.</p>
       <ul class="detail-list">${issues}</ul>
     </div>
+  `;
+}
+
+function renderVariantCompare(item, kind) {
+  const panel = document.querySelector("[data-compare-panel]");
+  const content = document.querySelector("[data-compare-content]");
+  if (!panel || !content || !latestState) {
+    return;
+  }
+
+  if (kind !== "variant") {
+    panel.hidden = true;
+    content.innerHTML = "";
+    return;
+  }
+
+  const baseSkill = latestState.skills.find((skill) => skill.id === item.baseSkillId || skill.baseSkillId === item.baseSkillId);
+  if (!baseSkill) {
+    panel.hidden = false;
+    content.innerHTML = "<p class='muted'>No base skill found for this variant.</p>";
+    return;
+  }
+
+  panel.hidden = false;
+  content.innerHTML = `
+    <article class="list-card">
+      <strong>${escapeHtml(baseSkill.name || "Base skill")}</strong>
+      <span>${escapeHtml(baseSkill.scenario || "No scenario")}</span>
+      <div class="meta-block">
+        <small>Base prompt / 基础模板</small>
+        <small>${escapeHtml((baseSkill.promptTemplate || "").slice(0, 220) || "No prompt template")}</small>
+      </div>
+      <div class="meta-block">
+        <small>Your variant focus / 你的优化点</small>
+        <small>${escapeHtml(item.changeSummary || "No change summary yet.")}</small>
+      </div>
+    </article>
   `;
 }
 
@@ -373,7 +402,7 @@ function renderSourcePreview(item) {
   }
 
   sourcePanel.hidden = false;
-  sourceContent.innerHTML = sources.map(renderSourceCard).join("");
+  sourceContent.innerHTML = sources.slice(0, 1).map(renderSourceCard).join("");
 }
 
 function renderSourceCard(source) {
@@ -392,9 +421,12 @@ function renderSourceCard(source) {
       <strong>${escapeHtml(source.sourceTitle || source.selectedText || "Source conversation")}</strong>
       <span>Platform / 平台: ${escapeHtml(source.sourcePlatform || "other")}</span>
       <span>Mode / 方式: ${escapeHtml(source.captureMode || "unknown")}</span>
-      <span>URL: ${escapeHtml(source.sourceUrl || "")}</span>
-      ${source.selectedText ? `<div class="meta-block"><small>Selected text / 选中文本</small><small>${escapeHtml(source.selectedText)}</small></div>` : ""}
-      ${turnsPreview ? `<div class="source-turns"><small>Conversation preview / 对话预览</small>${turnsPreview}</div>` : ""}
+      ${source.selectedText ? `<div class="meta-block"><small>Selected text / 选中文本</small><small>${escapeHtml(source.selectedText.slice(0, 180))}</small></div>` : ""}
+      <details class="raw-json-wrap">
+        <summary>View source details / 查看原始细节</summary>
+        <div class="meta-block"><small>URL</small><small>${escapeHtml(source.sourceUrl || "")}</small></div>
+        ${turnsPreview ? `<div class="source-turns"><small>Conversation preview / 对话预览</small>${turnsPreview}</div>` : ""}
+      </details>
       <div class="action-row">
         <button type="button" data-action="re-save-source-prompt" data-source-id="${source.id}">Save Source as Prompt / 另存为 Prompt</button>
         <button type="button" data-action="recompile-source-skill" data-source-id="${source.id}">Recompile to Draft / 重新编译为草稿</button>
@@ -655,7 +687,8 @@ document.querySelector("[data-detail-form]")?.addEventListener("submit", async (
   }
 
   if (kind === "variant") {
-    setFeedback("Variant editing is read-only for now. You can delete it or recreate it from a skill.");
+    await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.UPDATE_VARIANT, payload });
+    setFeedback("Variant updated.");
   }
 });
 

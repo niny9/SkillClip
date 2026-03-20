@@ -10,6 +10,7 @@ import {
   archiveSkill,
   findDraftById,
   findSkillById,
+  findVariantById,
   getAllState,
   getSettings,
   insertConversation,
@@ -27,7 +28,8 @@ import {
   seedDemoSkillIfNeeded,
   updateSettings,
   updateDraft,
-  updateSkill
+  updateSkill,
+  updateVariant
 } from "../lib/storage.js";
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -108,6 +110,8 @@ async function handleMessage(message, sender) {
       return updateDraftItem(message.payload);
     case MESSAGE_TYPES.UPDATE_SKILL:
       return updateSkillItem(message.payload);
+    case MESSAGE_TYPES.UPDATE_VARIANT:
+      return updateVariantItem(message.payload);
     case MESSAGE_TYPES.UPDATE_SETTINGS:
       return updateSettingsItem(message.payload);
     case MESSAGE_TYPES.GET_SETTINGS:
@@ -357,6 +361,25 @@ async function updateSkillItem(payload) {
   const item = await updateSkill(payload.id, (skill) => ({
     ...skill,
     ...validated,
+    updatedAt: nowIso()
+  }));
+  await broadcastStorageUpdate();
+  return item;
+}
+
+async function updateVariantItem(payload) {
+  const baseVariant = await findVariantById(payload.id);
+  if (!baseVariant) {
+    throw new Error("Variant not found");
+  }
+
+  const item = await updateVariant(payload.id, (variant) => ({
+    ...variant,
+    name: payload.name,
+    changeSummary: payload.goal,
+    scenarioOverride: payload.scenario,
+    promptTemplate: payload.promptTemplate,
+    steps: payload.steps,
     updatedAt: nowIso()
   }));
   await broadcastStorageUpdate();

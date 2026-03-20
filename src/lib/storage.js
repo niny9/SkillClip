@@ -165,6 +165,13 @@ export async function updateSkill(id, updater) {
   return next.find((skill) => skill.id === id) || null;
 }
 
+export async function updateVariant(id, updater) {
+  const bucket = await getBucket(STORAGE_KEYS.VARIANTS);
+  const next = bucket.map((variant) => (variant.id === id ? updater(variant) : variant));
+  await setBucket(STORAGE_KEYS.VARIANTS, next);
+  return next.find((variant) => variant.id === id) || null;
+}
+
 export async function archiveSkill(id) {
   return updateSkill(id, (skill) => ({
     ...skill,
@@ -200,6 +207,11 @@ export async function findDraftById(id) {
 
 export async function findSkillById(id) {
   const bucket = await getBucket(STORAGE_KEYS.SKILLS);
+  return bucket.find((item) => item.id === id) || null;
+}
+
+export async function findVariantById(id) {
+  const bucket = await getBucket(STORAGE_KEYS.VARIANTS);
   return bucket.find((item) => item.id === id) || null;
 }
 

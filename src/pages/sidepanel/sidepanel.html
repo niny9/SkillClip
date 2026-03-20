@@ -17,9 +17,9 @@
           <h2>Flow / 当前流程</h2>
           <div class="checklist">
             <p>1. Save Prompt 或 Save Whole Flow：先保存原始素材。</p>
-            <p>2. 系统会自动生成 Compile Preview / 编译预览。</p>
-            <p>3. 你确认预览没问题后，点 Save as Draft / 保存为草稿。</p>
-            <p>4. 草稿确认后，点 Promote to Skill / 升级成正式技能。</p>
+            <p>2. 系统会自动生成一个处理中技能。刚生成时叫 Preview，你确认后就变成 Draft。</p>
+            <p>3. Draft 再点 Promote to Skill / 升级成正式技能，就进入可复用技能区。</p>
+            <p>4. Variant / 优化版本 是你手动为同一场景分叉出的另一版，不是系统自动猜出来的。</p>
             <p>5. 如果误归档，可在 Archived / 已归档 里恢复。</p>
           </div>
         </section>
@@ -47,22 +47,19 @@
         </section>
 
         <section class="card">
-          <h2>Compile Preview / 编译预览</h2>
-          <div data-previews class="stack"></div>
+          <h2>Skills In Progress / 处理中技能</h2>
+          <p class="muted">Preview 是系统刚生成的结果，Draft 是你确认后可继续编辑的工作版本。</p>
+          <div data-in-progress class="stack"></div>
         </section>
 
         <section class="card">
-          <h2>Skill Drafts / 技能草稿</h2>
-          <div data-drafts class="stack"></div>
-        </section>
-
-        <section class="card">
-          <h2>Validated Skills / 正式技能</h2>
+          <h2>Ready Skills / 可复用技能</h2>
           <div data-skills class="stack"></div>
         </section>
 
         <section class="card">
-          <h2>Variants / 技能变体</h2>
+          <h2>Variants / 同场景优化版本</h2>
+          <p class="muted">这里放的是你手动为同一 skill 分出来的另一版，用于比较和优化。</p>
           <div data-variants class="stack"></div>
         </section>
 
@@ -139,12 +136,17 @@
         </section>
 
         <section class="detail-validation-block" data-validation-panel hidden>
-          <h3>Validation / 合理性检查</h3>
+          <h3>Quality Check / 自动检查</h3>
           <div data-validation-content class="stack"></div>
         </section>
 
+        <section class="detail-source-block" data-compare-panel hidden>
+          <h3>Base Skill / 基础版本对比</h3>
+          <div data-compare-content class="stack"></div>
+        </section>
+
         <section class="detail-source-block" data-source-panel hidden>
-          <h3>Source Preview / 来源预览</h3>
+          <h3>Source / 原始来源</h3>
           <div data-source-content class="stack"></div>
         </section>
       </aside>

@@ -23,8 +23,7 @@ async function load() {
   const settings = settingsResponse.result;
 
   updateCount("conversations", state.conversations.filter((item) => !item.archivedAt).length);
-  updateCount("previews", state.drafts.filter((item) => item.status === "preview").length);
-  updateCount("drafts", state.drafts.filter((item) => item.status === "draft").length);
+  updateCount("in_progress", state.drafts.filter((item) => item.status === "preview" || item.status === "draft").length);
   updateCount("skills", state.skills.filter((item) => item.status !== "archived").length);
   updateCount("variants", state.variants.length);
   updateCount(
@@ -60,8 +59,9 @@ function renderAssetBrowser(state) {
   }
 
   const inboxItems = state.conversations.filter((item) => !item.archivedAt);
-  const previewItems = state.drafts.filter((item) => item.status === "preview");
-  const draftItems = state.drafts.filter((item) => item.status === "draft");
+  const previewItems = state.drafts.filter((item) => item.status === "preview").map((item) => ({ ...item, uiStage: "preview" }));
+  const draftItems = state.drafts.filter((item) => item.status === "draft").map((item) => ({ ...item, uiStage: "draft" }));
+  const inProgressItems = [...previewItems, ...draftItems];
   const skillItems = state.skills.filter((item) => item.status !== "archived");
   const variantItems = state.variants || [];
   const archivedItems = [
@@ -72,9 +72,9 @@ function renderAssetBrowser(state) {
 
   node.innerHTML = [
     renderBrowserList("Inbox / 待整理素材", inboxItems, (item) => {
-      const title = item.title || item.selectionText || item.platform || "Untitled capture";
-      const subtitle = `${item.platform || "unknown"} · ${item.captureMode || "capture"}`;
-      const preview = item.selectionText || item.promptText || item.messages?.[0]?.text || "";
+      const title = item.sourceTitle || item.selectedText || item.sourcePlatform || "Untitled capture";
+      const subtitle = `${item.sourcePlatform || "unknown"} · ${item.captureMode || "capture"}`;
+      const preview = item.selectedText || item.turns?.[0]?.text || "";
       return `
         <article class="browser-item clickable-card" data-asset-kind="conversation" data-asset-id="${item.id}">
           <strong>${escapeHtml(title)}</strong>
@@ -86,19 +86,10 @@ function renderAssetBrowser(state) {
         </article>
       `;
     }),
-    renderBrowserList("Compile Preview / 编译预览", previewItems, (item) => `
+    renderBrowserList("In Progress / 处理中技能", inProgressItems, (item) => `
       <article class="browser-item clickable-card" data-asset-kind="draft" data-asset-id="${item.id}">
-        <strong>${escapeHtml(item.name || "Untitled preview")}</strong>
-        <p class="muted">${escapeHtml(item.useWhen || item.scenario || "Waiting for review before saving as draft.")}</p>
-        <p>${escapeHtml((item.goal || item.promptTemplate || "").slice(0, 180) || "No structured goal yet.")}</p>
-        <div class="action-row">
-          <button type="button" data-action="delete-asset" data-kind="draft" data-id="${item.id}">Delete / 删除</button>
-        </div>
-      </article>
-    `),
-    renderBrowserList("Drafts / 技能草稿", draftItems, (item) => `
-      <article class="browser-item clickable-card" data-asset-kind="draft" data-asset-id="${item.id}">
-        <strong>${escapeHtml(item.name || "Untitled draft")}</strong>
+        <strong>${escapeHtml(item.name || "Untitled skill in progress")}</strong>
+        <p class="muted">${escapeHtml(item.uiStage === "preview" ? "Preview / 系统刚生成，待你确认" : "Draft / 你已确认，可继续编辑")}</p>
         <p class="muted">${escapeHtml(item.useWhen || item.scenario || "No use-when summary yet.")}</p>
         <p>${escapeHtml((item.outputFormat || item.goal || "").slice(0, 180) || "No output format summary yet.")}</p>
         <div class="action-row">
@@ -384,10 +375,6 @@ document.addEventListener("click", async (event) => {
   }
 
   const action = target.dataset.action;
-  if (!action) {
-    return;
-  }
-
   if (action === "open-sidepanel") {
     const currentWindow = await chrome.windows.getCurrent();
     if (currentWindow?.id) {
@@ -463,6 +450,7 @@ document.addEventListener("click", async (event) => {
   const assetCard = target.closest("[data-asset-id]");
   if (assetCard instanceof HTMLElement && !target.closest("button")) {
     showSelectedAssetJson(assetCard.dataset.assetKind, assetCard.dataset.assetId);
+    return;
   }
 });
 

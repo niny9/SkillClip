@@ -269,7 +269,13 @@
 
       if (action === "save-flow") {
         const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.SAVE_FLOW, payload });
-        showToast(response?.result?.preview ? "Flow saved and compiled into preview" : "Whole flow saved");
+        if (!payload.turns.length && !payload.selectedText) {
+          showToast("No flow found on this page yet");
+        } else if (payload.fallbackFlow) {
+          showToast("Fallback flow saved and compiled into preview");
+        } else {
+          showToast(response?.result?.preview ? "Flow saved and compiled into preview" : "Whole flow saved");
+        }
       }
 
       if (action === "compile-skill") {
@@ -387,10 +393,24 @@
 
   function buildCapturePayload(action, preferredText = "") {
     const metadata = getConversationMetadata();
+    const selectedText = getSelectedText(preferredText);
+    let turns = action === "save-prompt" ? [] : readConversationTurns(8);
+
+    if (!turns.length && selectedText) {
+      turns = [
+        {
+          id: `turn_fallback_${Date.now()}`,
+          role: "user",
+          text: selectedText.slice(0, 1200)
+        }
+      ];
+    }
+
     return {
       ...metadata,
-      selectedText: getSelectedText(preferredText),
-      turns: action === "save-prompt" ? [] : readConversationTurns(8)
+      selectedText,
+      turns,
+      fallbackFlow: action === "save-flow" && turns.length === 1
     };
   }
 

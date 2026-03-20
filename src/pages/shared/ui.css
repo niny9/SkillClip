@@ -293,16 +293,32 @@ p {
   align-self: stretch;
 }
 
-.detail-source-block {
+.detail-extraction-block,
+.detail-source-block,
+.detail-validation-block {
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid var(--line);
 }
 
+[data-compare-panel] {
+  border-left: 4px solid #9b6b00;
+  padding-left: 0.8rem;
+}
+
+.detail-source-block {
+  border-left: 4px solid #6a83a0;
+  padding-left: 0.8rem;
+}
+
 .detail-validation-block {
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--line);
+  border-left: 4px solid #1f6f5f;
+  padding-left: 0.8rem;
+}
+
+.detail-extraction-block {
+  border-left: 4px solid #8a6f3b;
+  padding-left: 0.8rem;
 }
 
 .field-label {
