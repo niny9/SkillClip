@@ -5,7 +5,7 @@
 ## 仓库内容
 
 - [ ] `README.md` 已经能解释项目是什么、怎么装、怎么用
-- [ ] `README_EN.md` 已经能给英文用户一个基本入口
+- [ ] `README_CN.md` 已经给中文用户提供了清晰入口
 - [ ] `LICENSE` 已存在
 - [ ] `CONTRIBUTING.md` 已存在
 - [ ] `ROADMAP.md` 已存在

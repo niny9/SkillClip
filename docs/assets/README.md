@@ -1,31 +1,33 @@
 # Assets Placeholder
 
-这个目录用于存放 GitHub README、Release 和后续 Chrome Store 需要的截图或 GIF。
+This folder is for screenshots and GIFs used by the public GitHub README, releases, and a future Chrome Web Store listing.
 
-建议文件名直接按下面来放，后面链接最好不要频繁改：
+Use stable file names so public links do not need to change later.
 
-## README 截图建议
+## Recommended Screenshot Names
 
-- `workspace-placeholder.png`
-- `whole-flow-placeholder.png`
-- `workflow-prompt-placeholder.png`
-- `skill-insert-placeholder.png`
+For the current three screenshots, use:
 
-## 后续可补的 GIF
+- `hero-workspace.png`
+- `local-assets.png`
+- `model-config.png`
+
+## Recommended GIF Names
 
 - `capture-to-skill.gif`
 - `workflow-edit.gif`
 - `skill-reuse.gif`
 
-## 建议截图内容
+## Recommended Screenshot Content
 
-1. 工作台主界面
-2. Whole Flow 生成 Skill
-3. 单条 Workflow Prompt 编辑和优化
-4. 把 Skill 插回 AI 输入框
+1. AI page + workspace side panel
+2. Local asset management
+3. Model configuration
+4. Later: whole-flow-to-skill details and skill reuse in the input box
 
-## 图片建议
+## Image Guidelines
 
-- 宽图优先，适合 GitHub README 展示
-- 尽量统一尺寸
-- 尽量保留浏览器真实上下文，而不是只截局部
+- Prefer wide screenshots for GitHub README sections
+- Keep image sizes consistent
+- Keep real browser context visible instead of cropping too tightly
+- Use the hero screenshot first in both GitHub and X threads

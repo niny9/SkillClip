@@ -20,7 +20,7 @@
 重点看：
 
 - [README.md](../README.md)
-- [README_EN.md](../README_EN.md)
+- [README_CN.md](../README_CN.md)
 
 如果要更顺，建议至少补：
 

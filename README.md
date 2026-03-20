@@ -1,52 +1,55 @@
 # SkillClip
 
-把 AI 对话、Prompt 和 Whole Flow 编译成可复用技能。
+Turn AI chats, prompts, and whole flows into reusable skills.
 
 > Not a prompt manager. An AI skill compiler.
 
-SkillClip 想解决的不是“保存一句 Prompt”，而是：
+SkillClip is a local-first Chrome extension for turning:
 
-- 保存 AI 工作流的原始素材
-- 把粗糙 Prompt 优化成更可复用的 Prompt
-- 把多轮对话整理成 Skill
-- 把 Skill 作为 SOP 再插回 AI 输入框复用
-- 在同一场景下继续迭代第二版、第三版
+- single prompts
+- multiple prompts
+- whole AI chat flows
 
-## 一句话理解
+into reusable skills.
 
-SkillClip 是一个本地优先的 Chrome 扩展，用来把：
+[中文说明 / Chinese README](./README_CN.md)
 
-- 单条 Prompt
-- 多条 Prompt
-- 整段 AI 对话流程
+## TL;DR
 
-整理成可复用 Skill。
+SkillClip is a local-first Chrome extension that captures prompts and AI chat flows, then compiles them into reusable skills with workflow prompts, step mappings, and SOP-style runbooks.
 
-## Why It Matters
+## Why This Exists
 
-很多 Prompt 工具只能存文本片段。  
-但真正有价值的，往往是：
+Most prompt tools stop at text storage.
 
-- 一段来回优化出来的对话
-- 一个能复用的方法
-- 一组不断演化的工作流版本
+But the most valuable AI assets are often not single prompts. They are:
 
-SkillClip 管理的核心资产不是“句子”，而是：
+- conversations refined over multiple turns
+- reusable methods hidden inside AI chats
+- evolving workflow versions you want to compare and improve
 
-- `Raw Capture / 原始素材`
-- `Skill / 可复用技能`
-- `Variant / 同场景优化版本`
+SkillClip is built around that higher-level asset.
 
-## Current Features
+## What SkillClip Manages
 
-- 保存 `Prompt` 或 `Whole Flow`
-- 优化单条 Prompt
-- 把多条 Prompt 或整段对话编译成 Skill
-- 用 `Workflow Prompts -> Steps -> SOP Runbook` 组织 Skill
-- 编辑 Skill、Workflow Prompt 和 Variant
-- 把 Skill 插回当前 AI 输入框
-- 本地优先保存到 `chrome.storage.local`
-- 导出选中资产的 JSON
+- `Raw Capture`
+- `Skill`
+- `Variant`
+
+## What It Can Do Right Now
+
+- Save raw prompts and whole flows
+- Optimize rough prompts into cleaner reusable prompts
+- Compile prompts or whole flows into structured skills
+- Organize skills with:
+  - workflow prompts
+  - steps
+  - step-source mappings
+  - SOP-style runbooks
+- Edit skills, workflow prompts, and variants
+- Reinsert saved skills into current AI input boxes
+- Keep everything local-first in `chrome.storage.local`
+- Export selected assets as JSON
 
 ## Supported Platforms
 
@@ -61,93 +64,115 @@ SkillClip 管理的核心资产不是“句子”，而是：
 - Qwen / Tongyi
 - Copilot
 
-说明：
+Notes:
 
-- 不同平台 DOM 差异很大
-- 目前已经有通用适配和部分站点级特化
-- 稳定性还在持续迭代
+- DOM structures vary a lot across platforms
+- Some platform-specific handling already exists
+- Reliability is still improving
 
-## Core Flow
+## How It Works
 
-1. `Raw Capture / 原始素材`
-   保存单条 Prompt 或 Whole Flow
+1. `Raw Capture`
+   Save a single prompt or a whole flow
 
-2. `Prompt 优化`
-   把粗糙 Prompt 变成更清晰的可复用 Prompt
+2. `Prompt Optimization`
+   Turn rough prompts into clearer reusable prompts
 
-3. `Skill 编译`
-   把单条 Prompt、多条 Prompt 或整段对话整理成：
-   - 场景
-   - 目标
-   - 步骤
-   - Workflow Prompts
-   - SOP Runbook
+3. `Skill Compilation`
+   Turn prompts or full conversations into:
+   - scenario
+   - goal
+   - steps
+   - workflow prompts
+   - SOP runbook
 
-4. `Ready Skill / 可复用技能`
-   编辑确认后保存成正式技能
+4. `Ready Skill`
+   Review and keep the result as a reusable skill
 
-5. `Variant / 同场景优化版本`
-   为同一个 Skill 继续派生第二版、第三版
+5. `Variant`
+   Fork the same skill into second and third versions for the same scenario
 
 ## Screenshots
 
-建议后面补这 4 张图：
+Use the current three screenshots in this order:
 
-1. `Workspace / 工作台`
-2. `Whole Flow -> Skill`
-3. `Workflow Prompt 编辑`
-4. `Skill 插入 AI 输入框`
+1. `AI page + workspace side panel`
+   Caption: `Compile AI chats into reusable skills beside the conversation itself.`
 
-占位命名说明：
+2. `Local assets and workspace overview`
+   Caption: `Review raw captures, reusable skills, variants, and local assets in one workspace.`
+
+3. `Model-assisted configuration`
+   Caption: `Plug in your own model for prompt optimization, skill compilation, and checks.`
+
+Suggested README image block once the files are added to `docs/assets/`:
+
+```md
+![Hero workspace](./docs/assets/hero-workspace.png)
+*Compile AI chats into reusable skills beside the conversation itself.*
+
+![Local assets](./docs/assets/local-assets.png)
+*Review raw captures, reusable skills, variants, and local assets in one workspace.*
+
+![Model config](./docs/assets/model-config.png)
+*Plug in your own model for prompt optimization, skill compilation, and checks.*
+```
+
+File naming and usage guide:
 
 - [docs/assets/README.md](./docs/assets/README.md)
+- [docs/SCREENSHOT_USAGE.md](./docs/SCREENSHOT_USAGE.md)
 
-## Local-First Storage
+## Storage Model
 
-当前数据存储在：
+Current data is stored in:
 
 - `chrome.storage.local`
 
-这意味着：
+So:
 
-- 同一浏览器用户配置下，重启后通常还在
-- 不会自动同步给别人
-- 不会自动云同步
-- 卸载扩展、清空扩展数据、重置本地数据时会丢失
+- it usually survives normal browser restarts
+- it does not sync automatically across users or devices
+- it can be lost if the extension is removed or local extension data is cleared
 
-当前仍然是本地优先模式，还没有后端账户系统。
+There is no backend account system yet.
+
+## Current Limitations
+
+- platform compatibility is still improving
+- data is local-first and not cloud-synced
+- whole-flow-to-skill compilation still needs more polish
+- screenshot and demo assets are not complete yet
 
 ## Quick Start
 
-1. 打开 `chrome://extensions`
-2. 开启 `Developer mode`
-3. 点击 `Load unpacked`
-4. 选择当前项目根目录
-5. 打开一个支持的 AI 页面
-6. 保存 Prompt 或 Whole Flow
-7. 打开工作台
-8. 编辑并复用生成的 Skill
+1. Open `chrome://extensions`
+2. Turn on `Developer mode`
+3. Click `Load unpacked`
+4. Select the project root folder
+5. Open a supported AI site
+6. Save a prompt or a whole flow
+7. Open the workspace
+8. Edit and reuse the generated skill
 
 ## Model Assistance
 
-如果你在设置页填写了：
+If you configure:
 
 - `API Base URL`
 - `API Model`
 - `API Key`
 
-那么：
+then the following will prefer your configured model:
 
-- Prompt 优化
-- Workflow Prompt 优化
-- Whole Flow -> Skill 编译
-- Skill Check
+- prompt optimization
+- workflow prompt optimization
+- whole-flow-to-skill compilation
+- skill checks
 
-都会优先使用你配置的模型。
+## Repository Guide
 
-## Repo Guide
-
-核心文件：
+Core files:
 
 - [manifest.json](./manifest.json)
 - [src/background/service-worker.js](./src/background/service-worker.js)
@@ -157,30 +182,30 @@ SkillClip 管理的核心资产不是“句子”，而是：
 - [src/pages/sidepanel/sidepanel.html](./src/pages/sidepanel/sidepanel.html)
 - [src/pages/options/options.html](./src/pages/options/options.html)
 
-文档：
+Docs:
 
-- [English README](./README_EN.md)
+- [Chinese README](./README_CN.md)
 - [PRD](./docs/PRD.md)
-- [信息架构](./docs/INFORMATION_ARCHITECTURE.md)
-- [数据模型](./docs/DATA_MODEL.md)
-- [技术架构](./docs/TECH_ARCHITECTURE.md)
-- [开发说明](./docs/DEVELOPMENT.md)
-- [开源策略](./docs/OPEN_SOURCE_STRATEGY.md)
-- [公开前检查清单](./docs/PUBLIC_RELEASE_CHECKLIST.md)
-- [隐私说明](./PRIVACY.md)
+- [Information Architecture](./docs/INFORMATION_ARCHITECTURE.md)
+- [Data Model](./docs/DATA_MODEL.md)
+- [Technical Architecture](./docs/TECH_ARCHITECTURE.md)
+- [Development](./docs/DEVELOPMENT.md)
+- [Open Source Strategy](./docs/OPEN_SOURCE_STRATEGY.md)
+- [Public Release Checklist](./docs/PUBLIC_RELEASE_CHECKLIST.md)
+- [Privacy](./PRIVACY.md)
 
 ## Contributing
 
-欢迎一起补这些方向：
+Good areas to contribute:
 
-- 平台 DOM 适配
-- 输入框插入稳定性
-- Skill 编译质量
-- 中文 UX
-- 本地存储升级
-- 导出 / 同步 / Git 文件模式
+- platform DOM adapters
+- input insertion reliability
+- skill compilation quality
+- multilingual UX
+- storage upgrades
+- export / sync / file mode
 
-开始前建议先看：
+Start here:
 
 - [CONTRIBUTING.md](./CONTRIBUTING.md)
 - [ROADMAP.md](./ROADMAP.md)
