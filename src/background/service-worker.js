@@ -9,6 +9,7 @@ import {
   archiveDraft,
   archiveSkill,
   findDraftById,
+  findConversationById,
   findSkillById,
   findVariantById,
   getAllState,
@@ -26,6 +27,7 @@ import {
   restoreDraft,
   restoreSkill,
   seedDemoSkillIfNeeded,
+  updateConversation,
   updateSettings,
   updateDraft,
   updateSkill,
@@ -106,6 +108,8 @@ async function handleMessage(message, sender) {
       return deleteSkillItem(message.payload.skillId);
     case MESSAGE_TYPES.DELETE_VARIANT:
       return deleteVariantItem(message.payload.variantId);
+    case MESSAGE_TYPES.UPDATE_CONVERSATION:
+      return updateConversationItem(message.payload);
     case MESSAGE_TYPES.UPDATE_DRAFT:
       return updateDraftItem(message.payload);
     case MESSAGE_TYPES.UPDATE_SKILL:
@@ -331,6 +335,22 @@ async function updateDraftItem(payload) {
   const item = await updateDraft(payload.id, (draft) => ({
     ...draft,
     ...validated,
+    updatedAt: nowIso()
+  }));
+  await broadcastStorageUpdate();
+  return item;
+}
+
+async function updateConversationItem(payload) {
+  const baseConversation = await findConversationById(payload.id);
+  if (!baseConversation) {
+    throw new Error("Conversation not found");
+  }
+
+  const item = await updateConversation(payload.id, (conversation) => ({
+    ...conversation,
+    sourceTitle: payload.sourceTitle,
+    selectedText: payload.selectedText,
     updatedAt: nowIso()
   }));
   await broadcastStorageUpdate();

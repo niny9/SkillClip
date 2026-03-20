@@ -21,6 +21,12 @@ function inferScenario({ platform, selectedText, turns, title }) {
     .join(" ")
     .toLowerCase();
 
+  if (base.includes("podcast") || base.includes("播客") || base.includes("访谈") || base.includes("interview outline")) {
+    return "Podcast interview planning";
+  }
+  if (base.includes("提纲") || base.includes("outline") || base.includes("questions")) {
+    return "Interview outline generation";
+  }
   if (base.includes("sql")) {
     return "SQL debugging";
   }
@@ -37,10 +43,66 @@ function inferScenario({ platform, selectedText, turns, title }) {
   return "Reusable AI workflow";
 }
 
-function inferSteps(turns) {
+function inferOutputFormat(scenario) {
+  if (scenario === "Podcast interview planning" || scenario === "Interview outline generation") {
+    return "Interview outline with sections and follow-up questions";
+  }
+  if (scenario === "Product PRD writing") {
+    return "Structured PRD sections";
+  }
+  if (scenario === "Marketing copy generation") {
+    return "Headline options and copy variants";
+  }
+  return "Structured response";
+}
+
+function inferGoal(scenario, platform) {
+  if (scenario === "Podcast interview planning") {
+    return "Turn a raw topic or guest brief into a usable podcast interview plan";
+  }
+  if (scenario === "Interview outline generation") {
+    return "Turn a topic into a structured outline with better sequencing";
+  }
+  if (scenario === "Product PRD writing") {
+    return "Turn a rough product idea into a concise PRD draft";
+  }
+  if (scenario === "Marketing copy generation") {
+    return "Generate reusable marketing copy with a clear format";
+  }
+  return `Draft a reusable workflow based on the captured conversation from ${platform || "an AI tool"}`;
+}
+
+function inferUseWhen(scenario, selectedText = "") {
+  if (scenario === "Podcast interview planning") {
+    return "Use this skill when you need to prepare a podcast or interview outline from a topic, guest brief, or rough idea.";
+  }
+  if (scenario === "Interview outline generation") {
+    return "Use this skill when you want AI to turn rough notes into a clearer question flow or outline.";
+  }
+  return `Use this skill when you need help with ${scenario.toLowerCase()} and want a repeatable result based on the captured prompt or flow.`;
+}
+
+function inferNotFor(scenario) {
+  if (scenario === "Podcast interview planning" || scenario === "Interview outline generation") {
+    return "Do not use this skill when you need factual research, live verification, or a final polished article instead of an interview plan.";
+  }
+  return `Do not use this skill when the task is unrelated to ${scenario.toLowerCase()} or requires live external verification.`;
+}
+
+function inferSteps(turns, scenario, selectedText = "") {
   const userTurns = (turns || []).filter((turn) => turn.role === "user").slice(0, 4);
   const assistantTurns = (turns || []).filter((turn) => turn.role === "assistant").slice(0, 3);
   const steps = [];
+
+  if (scenario === "Podcast interview planning" || scenario === "Interview outline generation") {
+    return [
+      "Summarize the episode topic, guest, or core discussion goal.",
+      "Clarify the audience and the key takeaway the interview should deliver.",
+      "Ask for a structured outline with opening, main sections, and closing.",
+      "Generate layered questions: warm-up, core questions, and follow-up questions.",
+      "Return the outline in a format that can be used directly in a recording or prep doc."
+    ];
+  }
 
   if (userTurns[0]) {
     steps.push(`Clarify the task goal: ${titleFromText(userTurns[0].text, "Task goal")}`);
@@ -67,14 +129,6 @@ function inferSteps(turns) {
   return steps;
 }
 
-function inferUseWhen(scenario) {
-  return `Use this skill when you need help with ${scenario.toLowerCase()} and want a repeatable result.`;
-}
-
-function inferNotFor(scenario) {
-  return `Do not use this skill when the task is unrelated to ${scenario.toLowerCase()} or requires live external verification.`;
-}
-
 function inferSuccessCriteria(outputFormat) {
   return [
     "The output follows the requested structure.",
@@ -88,8 +142,8 @@ export function compileSkillDraft(payload, settings = {}) {
   const name = titleFromText(selectedText, payload.title || "Untitled Skill Draft");
   const scenario = inferScenario(payload);
   const inputs = extractVariablesFromText(selectedText);
-  const steps = inferSteps(payload.turns);
-  const outputFormat = "Structured response";
+  const steps = inferSteps(payload.turns, scenario, selectedText);
+  const outputFormat = inferOutputFormat(scenario);
 
   const draft = {
     id: createId("draft"),
@@ -98,9 +152,9 @@ export function compileSkillDraft(payload, settings = {}) {
     name,
     whatItDoes: `Auto-draft a reusable method from the captured conversation for ${scenario.toLowerCase()}.`,
     scenario,
-    useWhen: inferUseWhen(scenario),
+    useWhen: inferUseWhen(scenario, selectedText),
     notFor: inferNotFor(scenario),
-    goal: `Draft a reusable workflow based on the captured conversation from ${payload.platform || "an AI tool"}`,
+    goal: inferGoal(scenario, payload.platform),
     userIntent: titleFromText(selectedText, "Reuse this AI workflow"),
     inputs,
     constraints: [
@@ -130,7 +184,7 @@ function buildPromptTemplate(selectedText, inputs) {
 
   let template = selectedText;
   inputs.forEach((input) => {
-    const pattern = new RegExp(input.label, "ig");
+    const pattern = new RegExp(escapeRegExp(input.label), "ig");
     template = template.replace(pattern, `{{${input.key}}}`);
   });
 
@@ -139,6 +193,10 @@ function buildPromptTemplate(selectedText, inputs) {
   }
 
   return template;
+}
+
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 export function promoteDraftToSkill(draft, settings = {}) {

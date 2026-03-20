@@ -27,6 +27,7 @@ export const MESSAGE_TYPES = {
   DELETE_DRAFT: "skillclip/delete-draft",
   DELETE_SKILL: "skillclip/delete-skill",
   DELETE_VARIANT: "skillclip/delete-variant",
+  UPDATE_CONVERSATION: "skillclip/update-conversation",
   UPDATE_DRAFT: "skillclip/update-draft",
   UPDATE_SKILL: "skillclip/update-skill",
   UPDATE_VARIANT: "skillclip/update-variant",

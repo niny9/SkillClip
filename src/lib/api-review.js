@@ -20,11 +20,16 @@ export async function extractSkillDraftWithApi(payload, fallbackDraft, settings)
           role: "system",
           content: [
             "You extract a reusable AI skill from prompts and multi-turn conversations.",
+            "A raw prompt is not yet a skill. Convert it into a reusable workflow.",
             "Return strict JSON with keys:",
-            "name, whatItDoes, scenario, useWhen, notFor, goal, promptTemplate, outputFormat, steps, successCriteria.",
+            "name, whatItDoes, scenario, useWhen, notFor, goal, inputs, promptTemplate, outputFormat, steps, successCriteria.",
+            "useWhen must say when the skill should be used.",
+            "notFor must say when it should not be used.",
+            "goal must describe the user outcome.",
+            "inputs must be an array of { key, label, required, description }.",
             "steps must be an array of short strings.",
             "successCriteria must be an array of short strings.",
-            "Keep the result practical and reusable."
+            "Keep the result practical, reusable, and more structured than the original prompt."
           ].join(" ")
         },
         {
@@ -56,6 +61,7 @@ export async function extractSkillDraftWithApi(payload, fallbackDraft, settings)
     useWhen: parsed.useWhen || fallbackDraft.useWhen,
     notFor: parsed.notFor || fallbackDraft.notFor,
     goal: parsed.goal || fallbackDraft.goal,
+    inputs: Array.isArray(parsed.inputs) && parsed.inputs.length ? parsed.inputs : fallbackDraft.inputs,
     promptTemplate: parsed.promptTemplate || fallbackDraft.promptTemplate,
     outputFormat: parsed.outputFormat || fallbackDraft.outputFormat,
     steps: Array.isArray(parsed.steps) && parsed.steps.length ? parsed.steps : fallbackDraft.steps,

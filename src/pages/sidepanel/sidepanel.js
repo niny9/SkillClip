@@ -93,7 +93,7 @@ function renderConversation(item) {
     ? `<button type="button" data-action="edit-conversation-draft" data-id="${item.id}">Edit Suggestion / 编辑整理结果</button>`
     : "";
   return `
-    <article class="list-card queue-card queue-card-raw">
+    <article class="list-card clickable-card queue-card queue-card-raw" data-detail-kind="conversation" data-detail-id="${item.id}">
       <strong>${escapeHtml(item.selectedText || item.sourceTitle || "Captured conversation")}</strong>
       <span class="queue-badge">Raw capture / 原始素材</span>
       <span>Source / 来源: ${escapeHtml(item.sourcePlatform || "other")} · Mode / 方式: ${escapeHtml(item.captureMode)}</span>
@@ -203,30 +203,51 @@ async function openConversationDraftDetail(conversationId) {
 }
 
 function showDetailPanel(item, kind) {
+  const promptForm = document.querySelector("[data-prompt-form]");
   const form = document.querySelector("[data-detail-form]");
   const empty = document.querySelector("[data-detail-empty]");
   const title = document.querySelector("[data-detail-title]");
   const note = document.querySelector("[data-detail-note]");
-  if (!form || !empty) {
+  if (!form || !empty || !promptForm) {
     return;
   }
 
   selectedDetail = { id: item.id, kind };
   updateSelectedCards();
   if (title) {
-    const kindLabel = kind === "draft" ? "Draft / 草稿" : kind === "skill" ? "Skill / 正式技能" : "Variant / 变体";
+    const kindLabel = kind === "conversation"
+      ? "Prompt / 原始素材"
+      : kind === "draft"
+        ? "Draft / 草稿"
+        : kind === "skill"
+          ? "Skill / 正式技能"
+          : "Variant / 变体";
     title.textContent = `Selected / 当前选中: ${kindLabel} - ${item.name || item.id}`;
   }
 
   empty.hidden = true;
-  form.hidden = false;
+  promptForm.hidden = kind !== "conversation";
+  form.hidden = kind === "conversation";
   if (note) {
     note.hidden = false;
-    note.textContent = kind === "skill"
+    note.textContent = kind === "conversation"
+      ? "Prompt detail stays simple: source, title, and captured content. Structured fields only belong to reusable skills."
+      : kind === "skill"
       ? "This skill can be reused directly, but the fields below are still editable."
       : kind === "variant"
         ? "This is your manual alternative version for the same scenario. Edit it freely."
         : "This is an auto-generated draft suggestion. You should edit it before promoting it to a reusable skill.";
+  }
+  if (kind === "conversation") {
+    promptForm.elements.id.value = item.id || "";
+    promptForm.elements.sourceTitle.value = item.sourceTitle || "";
+    promptForm.elements.selectedText.value = item.selectedText || item.turns?.[0]?.text || "";
+    renderPromptMeta(item);
+    renderExtractionPreview(null);
+    renderValidationPreview(null);
+    renderVariantCompare(item, kind);
+    renderSourcePreview(item);
+    return;
   }
   form.elements.id.value = item.id || "";
   form.elements.kind.value = kind;
@@ -246,6 +267,8 @@ function showDetailPanel(item, kind) {
 }
 
 function hideDetailPanel() {
+  const promptForm = document.querySelector("[data-prompt-form]");
+  const promptMeta = document.querySelector("[data-prompt-meta]");
   const form = document.querySelector("[data-detail-form]");
   const empty = document.querySelector("[data-detail-empty]");
   const sourcePanel = document.querySelector("[data-source-panel]");
@@ -258,12 +281,14 @@ function hideDetailPanel() {
   const compareContent = document.querySelector("[data-compare-content]");
   const title = document.querySelector("[data-detail-title]");
   const note = document.querySelector("[data-detail-note]");
-  if (!form || !empty) {
+  if (!form || !empty || !promptForm) {
     return;
   }
 
   selectedDetail = null;
   updateSelectedCards();
+  promptForm.hidden = true;
+  promptForm.reset();
   form.hidden = true;
   form.reset();
   empty.hidden = false;
@@ -297,6 +322,22 @@ function hideDetailPanel() {
   if (compareContent) {
     compareContent.innerHTML = "";
   }
+}
+
+function renderPromptMeta(item) {
+  const container = document.querySelector("[data-prompt-meta]");
+  if (!container) {
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="meta-block">
+      <small>Platform / 平台: ${escapeHtml(item.sourcePlatform || "other")}</small>
+      <small>Mode / 方式: ${escapeHtml(item.captureMode || "selection")}</small>
+      <small>URL / 链接: ${escapeHtml(item.sourceUrl || "")}</small>
+      <small>Turns / 对话轮次: ${escapeHtml(String(item.turns?.length || 0))}</small>
+    </div>
+  `;
 }
 
 function updateSelectedCards() {
@@ -409,6 +450,12 @@ function renderSourcePreview(item) {
   const sourcePanel = document.querySelector("[data-source-panel]");
   const sourceContent = document.querySelector("[data-source-content]");
   if (!sourcePanel || !sourceContent || !latestState) {
+    return;
+  }
+
+  if (item?.kind === "conversation_memory") {
+    sourcePanel.hidden = false;
+    sourceContent.innerHTML = renderSourceCard(item);
     return;
   }
 
@@ -644,6 +691,13 @@ document.addEventListener("click", async (event) => {
     }
   }
 
+  if (detailKind === "conversation") {
+    const item = latestState.conversations.find((conversation) => conversation.id === detailId);
+    if (item) {
+      showDetailPanel(item, "conversation");
+    }
+  }
+
   if (detailKind === "skill") {
     const item = latestState.skills.find((skill) => skill.id === detailId);
     if (item) {
@@ -708,4 +762,22 @@ document.querySelector("[data-detail-form]")?.addEventListener("submit", async (
   }
 });
 
+document.querySelector("[data-prompt-form]")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+  await chrome.runtime.sendMessage({
+    type: MESSAGE_TYPES.UPDATE_CONVERSATION,
+    payload: {
+      id: String(formData.get("id") || ""),
+      sourceTitle: String(formData.get("sourceTitle") || ""),
+      selectedText: String(formData.get("selectedText") || "")
+    }
+  });
+  setFeedback("Prompt updated.");
+});
+
 load();
+  if (promptMeta) {
+    promptMeta.innerHTML = "";
+  }

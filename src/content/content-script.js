@@ -713,8 +713,9 @@
     const selectors = [...(adapter.inputSelectors || []), "textarea", "div[contenteditable='true']", "div[role='textbox']", "input[type='text']"];
 
     for (const selector of selectors) {
-      const element = document.querySelector(selector);
-      if (element instanceof HTMLElement && isVisible(element)) {
+      const elements = Array.from(document.querySelectorAll(selector));
+      const element = elements.find((node) => node instanceof HTMLElement && isVisible(node) && !isInsideSkillclipUi(node));
+      if (element instanceof HTMLElement) {
         return element;
       }
     }
@@ -723,7 +724,7 @@
   }
 
   function matchesInputTarget(target) {
-    return target.matches("textarea, input, [contenteditable='true'], div[role='textbox']");
+    return target.matches("textarea, input, [contenteditable='true'], div[role='textbox']") && !isInsideSkillclipUi(target);
   }
 
   function insertSkill(skill) {
@@ -885,6 +886,7 @@
       const nextValue = append ? `${element.value}${text}` : text;
       element.value = nextValue;
       element.dispatchEvent(new Event("input", { bubbles: true }));
+      element.dispatchEvent(new Event("change", { bubbles: true }));
       element.focus();
       return;
     }
@@ -905,6 +907,7 @@
     }
 
     element.dispatchEvent(new Event("input", { bubbles: true }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
   function findFirstText(selectors) {

@@ -95,6 +95,13 @@ export async function removeConversation(id) {
   await setBucket(STORAGE_KEYS.CONVERSATIONS, next);
 }
 
+export async function updateConversation(id, updater) {
+  const bucket = await getBucket(STORAGE_KEYS.CONVERSATIONS);
+  const next = bucket.map((item) => (item.id === id ? updater(item) : item));
+  await setBucket(STORAGE_KEYS.CONVERSATIONS, next);
+  return next.find((item) => item.id === id) || null;
+}
+
 export async function archiveConversation(id) {
   const bucket = await getBucket(STORAGE_KEYS.CONVERSATIONS);
   const next = bucket.map((item) => (
@@ -202,6 +209,11 @@ export async function removeVariant(id) {
 
 export async function findDraftById(id) {
   const bucket = await getBucket(STORAGE_KEYS.DRAFTS);
+  return bucket.find((item) => item.id === id) || null;
+}
+
+export async function findConversationById(id) {
+  const bucket = await getBucket(STORAGE_KEYS.CONVERSATIONS);
   return bucket.find((item) => item.id === id) || null;
 }
 

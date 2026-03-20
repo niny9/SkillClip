@@ -74,6 +74,8 @@
 .skillclip-panel-body button,
 .skillclip-panel-body input {
   font: inherit;
+  box-sizing: border-box;
+  appearance: none;
 }
 
 .skillclip-panel-header button,
@@ -113,6 +115,8 @@
   padding: 0.85rem 0.9rem;
   border: 1px solid var(--skillclip-line);
   border-radius: 14px;
+  outline: none;
+  box-shadow: none;
 }
 
 .skillclip-list {

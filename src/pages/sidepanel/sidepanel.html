@@ -29,7 +29,7 @@
             <button type="button" data-action="open-actionbar">Open Action Bar / 打开操作条</button>
             <button type="button" data-action="open-palette">Open Skill Palette / 打开技能面板</button>
             <button type="button" data-action="open-control-center">Open Control Center / 打开控制中心</button>
-            <button type="button" data-action="refresh-workspace">Refresh / 刷新</button>
+            <button type="button" data-action="refresh-workspace">Sync Latest / 同步最新数据</button>
           </div>
           <p class="muted" data-feedback>
             Open an AI page, then use these buttons to trigger the in-page tools.
@@ -64,11 +64,33 @@
         <h2>Details / 详情编辑</h2>
         <p class="muted" data-detail-title>Nothing selected / 当前未选中任何条目</p>
         <p class="muted" data-detail-empty>
-          Click a draft or skill card to inspect and edit it here.
+          Click a raw capture, skill, or variant card to inspect and edit it here.
         </p>
         <p class="muted" data-detail-note hidden>
           These fields are auto-generated draft suggestions from AI or local rules. Edit them before treating them as final.
         </p>
+        <form data-prompt-form hidden>
+          <input type="hidden" name="id" />
+          <label class="field-label">
+            <span>Prompt Title / Prompt 标题</span>
+            <input name="sourceTitle" type="text" />
+          </label>
+
+          <label class="field-label">
+            <span>Prompt Content / Prompt 内容</span>
+            <textarea name="selectedText" rows="10"></textarea>
+          </label>
+
+          <section class="detail-source-block">
+            <h3>Prompt Source / Prompt 来源</h3>
+            <div data-prompt-meta class="stack"></div>
+          </section>
+
+          <div class="action-row">
+            <button type="submit">Save Prompt / 保存 Prompt</button>
+            <button type="button" data-action="clear-detail">Close / 关闭</button>
+          </div>
+        </form>
         <form data-detail-form hidden>
           <input type="hidden" name="id" />
           <input type="hidden" name="kind" />
