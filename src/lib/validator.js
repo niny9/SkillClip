@@ -33,9 +33,9 @@ function runLocalValidation(asset) {
     score -= 16;
   }
 
-  if (!asset.promptTemplate || asset.promptTemplate.trim().length < 20) {
-    issues.push("Prompt template is too short.");
-    score -= 20;
+  if (!asset.promptTemplate || asset.promptTemplate.trim().length < 12) {
+    issues.push("Run prompt is short. Review whether the steps are detailed enough.");
+    score -= 8;
   }
 
   if (!asset.steps || asset.steps.length < 2) {

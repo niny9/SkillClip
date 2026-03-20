@@ -43,6 +43,10 @@
         <section class="card">
           <h2>Raw Captures / 原始素材</h2>
           <p class="muted">这里是你保存下来的原始内容。系统会自动整理一版建议；你可以直接编辑，或者直接升级为正式技能。</p>
+          <div class="action-row">
+            <button type="button" data-action="compile-selected">Create Skill From Selected / 用选中的 Prompt 生成技能</button>
+            <span class="muted" data-selected-count>Selected / 已选择: 0</span>
+          </div>
           <div data-queue-raw class="stack"></div>
         </section>
 
@@ -102,7 +106,7 @@
 
           <label class="field-label">
             <span>Scenario / 使用场景</span>
-            <input name="scenario" type="text" />
+            <input name="scenario" type="text" list="skillclip-scenario-options" />
           </label>
 
           <label class="field-label">
@@ -121,14 +125,17 @@
           </label>
 
           <label class="field-label">
-            <span>Prompt Template / 提示词模板</span>
-            <textarea name="promptTemplate" rows="8"></textarea>
-          </label>
-
-          <label class="field-label">
             <span>Steps / 步骤（每行一步）</span>
             <textarea name="steps" rows="6"></textarea>
           </label>
+
+          <details class="raw-json-wrap">
+            <summary>Run Prompt / 运行文本（自动生成）</summary>
+            <label class="field-label">
+              <span>Run Prompt / 运行文本</span>
+              <textarea name="promptTemplate" rows="8"></textarea>
+            </label>
+          </details>
 
           <label class="field-label">
             <span>Output Format / 输出格式</span>
@@ -142,6 +149,7 @@
 
           <div class="action-row">
             <button type="submit">Save Changes / 保存修改</button>
+            <button type="button" data-action="run-skill-check">Run Skill Check / 试运行检查</button>
             <button type="button" data-action="clear-detail">Close / 关闭</button>
           </div>
         </form>
@@ -156,6 +164,16 @@
           <div data-validation-content class="stack"></div>
         </section>
 
+        <section class="detail-extraction-block" data-run-check-panel hidden>
+          <h3>Run Check / 试运行结果</h3>
+          <div data-run-check-content class="stack"></div>
+        </section>
+
+        <section class="detail-source-block" data-step-map-panel hidden>
+          <h3>Step Mapping / 步骤来源映射</h3>
+          <div data-step-map-content class="stack"></div>
+        </section>
+
         <section class="detail-source-block" data-compare-panel hidden>
           <h3>Base Skill / 基础版本对比</h3>
           <div data-compare-content class="stack"></div>
@@ -167,6 +185,18 @@
         </section>
       </aside>
     </main>
+    <datalist id="skillclip-scenario-options">
+      <option value="Podcast interview planning"></option>
+      <option value="Interview outline generation"></option>
+      <option value="Product PRD writing"></option>
+      <option value="Marketing copy generation"></option>
+      <option value="SQL debugging"></option>
+      <option value="Research synthesis"></option>
+      <option value="Meeting summary"></option>
+      <option value="Writing assistant"></option>
+      <option value="Coding workflow"></option>
+      <option value="Learning plan"></option>
+    </datalist>
     <script type="module" src="./sidepanel.js"></script>
   </body>
   </html>

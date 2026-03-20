@@ -129,6 +129,65 @@ function inferSteps(turns, scenario, selectedText = "") {
   return steps;
 }
 
+function inferStepSources(turns = [], steps = [], scenario = "") {
+  if (scenario === "Podcast interview planning" || scenario === "Interview outline generation") {
+    return steps.map((step) => buildStepSourceMatch(step, turns, 2));
+  }
+
+  return steps.map((step) => buildStepSourceMatch(step, turns, 2));
+}
+
+function buildStepSourceMatch(step, turns, limit = 2) {
+  const rankedTurns = (turns || [])
+    .map((turn) => ({
+      turn,
+      score: scoreStepAgainstTurn(step, turn?.text || "")
+    }))
+    .filter((item) => item.score > 0)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, limit)
+    .map((item) => item.turn);
+
+  if (!rankedTurns.length) {
+    const fallbackTurn = turns[0];
+    return {
+      step,
+      sourceTurnIds: fallbackTurn?.id ? [fallbackTurn.id] : [],
+      sourcePreview: fallbackTurn?.text?.slice(0, 220) || ""
+    };
+  }
+
+  return {
+    step,
+    sourceTurnIds: dedupe(rankedTurns.map((turn) => turn.id).filter(Boolean)),
+    sourcePreview: rankedTurns.map((turn) => turn.text).join(" | ").slice(0, 220)
+  };
+}
+
+function scoreStepAgainstTurn(step, text) {
+  const stepTokens = tokenizeForMatch(step);
+  const turnTokens = new Set(tokenizeForMatch(text));
+  if (!stepTokens.length || !turnTokens.size) {
+    return 0;
+  }
+
+  let score = 0;
+  stepTokens.forEach((token) => {
+    if (turnTokens.has(token)) {
+      score += token.length > 5 ? 3 : 1;
+    }
+  });
+  return score;
+}
+
+function tokenizeForMatch(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, " ")
+    .split(/\s+/)
+    .filter((token) => token && token.length >= 2);
+}
+
 function inferSuccessCriteria(outputFormat) {
   return [
     "The output follows the requested structure.",
@@ -138,11 +197,12 @@ function inferSuccessCriteria(outputFormat) {
 }
 
 export function compileSkillDraft(payload, settings = {}) {
-  const selectedText = payload.selectedText || payload.turns?.[0]?.text || "";
+  const selectedText = payload.selectedText || summarizeTurnsForDraft(payload.turns) || payload.turns?.[0]?.text || "";
   const name = titleFromText(selectedText, payload.title || "Untitled Skill Draft");
   const scenario = inferScenario(payload);
   const inputs = extractVariablesFromText(selectedText);
   const steps = inferSteps(payload.turns, scenario, selectedText);
+  const stepSources = inferStepSources(payload.turns || [], steps, scenario);
   const outputFormat = inferOutputFormat(scenario);
 
   const draft = {
@@ -162,11 +222,17 @@ export function compileSkillDraft(payload, settings = {}) {
       "Keep the output reusable across AI tools"
     ],
     steps,
+    stepSources,
     promptTemplate: buildPromptTemplate(selectedText, inputs),
     outputFormat,
     successCriteria: inferSuccessCriteria(outputFormat),
     example: selectedText,
-    sourceConversationIds: [payload.conversationId],
+    preferredForPlatforms: payload.platforms?.length
+      ? payload.platforms
+      : [payload.platform].filter(Boolean),
+    sourceConversationIds: payload.conversationIds?.length
+      ? payload.conversationIds
+      : [payload.conversationId].filter(Boolean),
     createdAt: nowIso(),
     updatedAt: nowIso()
   };
@@ -175,6 +241,14 @@ export function compileSkillDraft(payload, settings = {}) {
     ...draft,
     validation: validateSkillAsset(draft, settings)
   };
+}
+
+function summarizeTurnsForDraft(turns = []) {
+  const relevantTurns = turns
+    .filter((turn) => turn?.text)
+    .slice(0, 6)
+    .map((turn) => `${turn.role || "unknown"}: ${turn.text}`);
+  return relevantTurns.join("\n\n").slice(0, 2400);
 }
 
 function buildPromptTemplate(selectedText, inputs) {
@@ -215,13 +289,14 @@ export function promoteDraftToSkill(draft, settings = {}) {
     inputs: draft.inputs,
     constraints: draft.constraints,
     steps: draft.steps,
+    stepSources: draft.stepSources || [],
     promptTemplate: draft.promptTemplate,
     outputFormat: draft.outputFormat,
     successCriteria: draft.successCriteria,
     example: draft.example,
     tags: [],
     sourceConversationIds: draft.sourceConversationIds,
-    preferredForPlatforms: [],
+    preferredForPlatforms: draft.preferredForPlatforms || [],
     preferredForModels: [],
     usageCount: 0,
     createdAt: nowIso(),
@@ -245,6 +320,7 @@ export function createVariantFromSkill(skill) {
     promptTemplate: skill.promptTemplate,
     constraints: skill.constraints,
     steps: skill.steps,
+    stepSources: skill.stepSources || [],
     preferredForPlatforms: skill.preferredForPlatforms || [],
     preferredForModels: skill.preferredForModels || [],
     usageCount: 0,

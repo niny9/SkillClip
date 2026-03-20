@@ -9,6 +9,7 @@
     PING: "skillclip/ping",
     OPEN_ACTION_BAR: "skillclip/open-action-bar",
     OPEN_SKILL_PALETTE: "skillclip/open-skill-palette",
+    APPLY_SKILL: "skillclip/apply-skill",
     SAVE_PROMPT: "skillclip/save-prompt",
     SAVE_FLOW: "skillclip/save-flow",
     COMPILE_SKILL: "skillclip/compile-skill",
@@ -26,6 +27,10 @@
     DEEPSEEK: "deepseek",
     PERPLEXITY: "perplexity",
     KIMI: "kimi",
+    DOUBAO: "doubao",
+    YUANBAO: "yuanbao",
+    QWEN: "qwen",
+    COPILOT: "copilot",
     OTHER: "other"
   };
 
@@ -148,6 +153,46 @@
         return guessRoleFromText(text);
       },
       textFromNode: (node) => readRichText(node)
+    },
+    {
+      id: PLATFORMS.DOUBAO,
+      matches: (hostname) => hostname === "www.doubao.com" || hostname === "doubao.com",
+      inputSelectors: ["textarea", "div[contenteditable='true']", "div[role='textbox']"],
+      titleSelectors: ["main h1", "title"],
+      modelSelectors: ["button[aria-haspopup='menu']", "[class*='model']"],
+      messageSelectors: ["main article", "[data-message-id]", "[role='listitem']", "[class*='message']"],
+      roleFromNode: (node) => guessRoleFromText(node.textContent || ""),
+      textFromNode: (node) => readRichText(node)
+    },
+    {
+      id: PLATFORMS.YUANBAO,
+      matches: (hostname) => hostname === "yuanbao.tencent.com",
+      inputSelectors: ["textarea", "div[contenteditable='true']", "div[role='textbox']"],
+      titleSelectors: ["main h1", "title"],
+      modelSelectors: ["button[aria-haspopup='menu']", "[class*='model']"],
+      messageSelectors: ["main article", "[data-message-id]", "[role='listitem']", "[class*='message']"],
+      roleFromNode: (node) => guessRoleFromText(node.textContent || ""),
+      textFromNode: (node) => readRichText(node)
+    },
+    {
+      id: PLATFORMS.QWEN,
+      matches: (hostname) => hostname === "tongyi.aliyun.com" || hostname === "qianwen.aliyun.com",
+      inputSelectors: ["textarea", "div[contenteditable='true']", "div[role='textbox']"],
+      titleSelectors: ["main h1", "title"],
+      modelSelectors: ["button[aria-haspopup='menu']", "[class*='model']"],
+      messageSelectors: ["main article", "[data-message-id]", "[role='listitem']", "[class*='message']"],
+      roleFromNode: (node) => guessRoleFromText(node.textContent || ""),
+      textFromNode: (node) => readRichText(node)
+    },
+    {
+      id: PLATFORMS.COPILOT,
+      matches: (hostname) => hostname === "copilot.microsoft.com",
+      inputSelectors: ["textarea", "div[contenteditable='true']", "div[role='textbox']"],
+      titleSelectors: ["main h1", "title"],
+      modelSelectors: ["button[aria-haspopup='menu']", "[class*='model']"],
+      messageSelectors: ["main article", "[data-message-id]", "[role='listitem']", "[class*='message']"],
+      roleFromNode: (node) => guessRoleFromText(node.textContent || ""),
+      textFromNode: (node) => readRichText(node)
     }
   ];
 
@@ -174,6 +219,11 @@
       }
       if (message.type === MESSAGE_TYPES.OPEN_SKILL_PALETTE) {
         openSkillPalette();
+      }
+      if (message.type === MESSAGE_TYPES.APPLY_SKILL) {
+        const ok = insertSkill(message.payload?.skill);
+        sendResponse?.({ ok });
+        return;
       }
       if (message.type === MESSAGE_TYPES.STORAGE_UPDATED) {
         loadState();
@@ -728,29 +778,68 @@
   }
 
   function insertSkill(skill) {
+    if (!skill) {
+      showToast("No skill payload received");
+      return false;
+    }
+
+    const adapter = getCurrentAdapter();
     const activeInput = lastFocusedInput instanceof HTMLElement && lastFocusedInput.isConnected && isVisible(lastFocusedInput)
       ? lastFocusedInput
       : document.activeElement instanceof HTMLElement && matchesInputTarget(document.activeElement)
       ? document.activeElement
       : getActiveInput();
 
-    const text = resolveTemplate(skill);
+    const text = buildRuntimeSkillText(skill);
     if (!activeInput) {
       showToast("No AI input found on this page");
-      return;
+      return false;
     }
 
-    insertTextIntoInput(activeInput, text, false);
+    insertTextIntoInput(activeInput, text, false, adapter.id);
     lastFocusedInput = activeInput;
+    const insertedValue = readInputValue(activeInput);
+    const success = normalizeForCompare(insertedValue).includes(normalizeForCompare(text).slice(0, 40));
+    if (!success) {
+      showToast("Skill inserted, but this site may need manual review");
+    }
+    return success;
   }
 
-  function resolveTemplate(skill) {
-    let template = skill.promptTemplate || "";
+  function buildRuntimeSkillText(skill) {
+    const values = {};
     (skill.inputs || []).forEach((input) => {
-      const value = window.prompt(`Value for ${input.label || input.key}`) || "";
-      template = template.replaceAll(`{{${input.key}}}`, value);
+      values[input.key] = window.prompt(`Value for ${input.label || input.key}`) || "";
     });
-    return template;
+
+    const resolvedTemplate = applyInputValues(skill.promptTemplate || "", values);
+    const steps = (skill.steps || []).map((step, index) => `${index + 1}. ${applyInputValues(step, values)}`);
+    const successCriteria = (skill.successCriteria || []).map((item) => `- ${applyInputValues(item, values)}`);
+    const providedInputs = Object.entries(values)
+      .filter(([, value]) => value && value.trim())
+      .map(([key, value]) => `- ${key}: ${value.trim()}`);
+
+    const lines = [
+      skill.goal ? `Goal: ${applyInputValues(skill.goal, values)}` : "",
+      skill.useWhen ? `Use when: ${applyInputValues(skill.useWhen, values)}` : "",
+      providedInputs.length ? "Inputs:" : "",
+      ...providedInputs,
+      steps.length ? "Steps:" : "",
+      ...steps,
+      skill.outputFormat ? `Output format: ${applyInputValues(skill.outputFormat, values)}` : "",
+      successCriteria.length ? "Success criteria:" : "",
+      ...successCriteria,
+      resolvedTemplate ? "Reference prompt:" : "",
+      resolvedTemplate || ""
+    ].filter(Boolean);
+
+    return lines.join("\n");
+  }
+
+  function applyInputValues(template, values) {
+    return Object.entries(values || {}).reduce((current, [key, value]) => (
+      current.replaceAll(`{{${key}}}`, value)
+    ), template || "");
   }
 
   function toggleVoiceCapture(button) {
@@ -881,33 +970,149 @@
     container.innerHTML = "";
   }
 
-  function insertTextIntoInput(element, text, append) {
+  function insertTextIntoInput(element, text, append, platformId = PLATFORMS.OTHER) {
     if (element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement) {
       const nextValue = append ? `${element.value}${text}` : text;
-      element.value = nextValue;
-      element.dispatchEvent(new Event("input", { bubbles: true }));
-      element.dispatchEvent(new Event("change", { bubbles: true }));
+      setNativeInputValue(element, nextValue);
       element.focus();
       return;
     }
 
     element.focus();
+    insertIntoContentEditable(element, text, append, platformId);
+  }
 
-    if (!append) {
-      if (typeof document.execCommand === "function") {
-        document.execCommand("selectAll", false, null);
-        document.execCommand("insertText", false, text);
-      } else {
-        element.textContent = text;
-      }
-    } else if (typeof document.execCommand === "function") {
-      document.execCommand("insertText", false, text);
+  function setNativeInputValue(element, value) {
+    const prototype = element instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype;
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+
+    element.dispatchEvent(new InputEvent("beforeinput", {
+      bubbles: true,
+      cancelable: true,
+      data: value,
+      inputType: "insertText"
+    }));
+
+    if (descriptor?.set) {
+      descriptor.set.call(element, value);
     } else {
-      element.textContent = `${element.textContent || ""}${text}`;
+      element.value = value;
     }
 
-    element.dispatchEvent(new Event("input", { bubbles: true }));
+    element.dispatchEvent(new InputEvent("input", {
+      bubbles: true,
+      data: value,
+      inputType: "insertText"
+    }));
     element.dispatchEvent(new Event("change", { bubbles: true }));
+    element.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true, key: "Enter" }));
+  }
+
+  function insertIntoContentEditable(element, text, append, platformId) {
+    if (platformId === PLATFORMS.GEMINI || platformId === PLATFORMS.DEEPSEEK || platformId === PLATFORMS.DOUBAO || platformId === PLATFORMS.QWEN || platformId === PLATFORMS.COPILOT) {
+      setStructuredEditableContent(element, text, append);
+      return;
+    }
+
+    if (!append) {
+      selectAllContent(element);
+    } else {
+      placeCaretAtEnd(element);
+    }
+
+    let inserted = false;
+    try {
+      inserted = document.execCommand?.("insertText", false, text) || false;
+    } catch (error) {
+      inserted = false;
+    }
+
+    if (!inserted) {
+      const selection = window.getSelection();
+      if (selection?.rangeCount) {
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(document.createTextNode(text));
+        placeCaretAtEnd(element);
+      } else {
+        element.textContent = append ? `${element.textContent || ""}${text}` : text;
+      }
+    }
+
+    element.dispatchEvent(new InputEvent("beforeinput", {
+      bubbles: true,
+      cancelable: true,
+      data: text,
+      inputType: append ? "insertText" : "insertReplacementText"
+    }));
+    element.dispatchEvent(new InputEvent("input", {
+      bubbles: true,
+      data: text,
+      inputType: append ? "insertText" : "insertReplacementText"
+    }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+    element.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true, key: "Enter" }));
+  }
+
+  function setStructuredEditableContent(element, text, append) {
+    const finalText = append ? `${readInputValue(element)}${text}` : text;
+    const lines = finalText.split("\n");
+    element.innerHTML = "";
+
+    lines.forEach((line, index) => {
+      if (index > 0) {
+        element.appendChild(document.createElement("br"));
+      }
+      element.appendChild(document.createTextNode(line));
+    });
+
+    placeCaretAtEnd(element);
+    element.dispatchEvent(new InputEvent("beforeinput", {
+      bubbles: true,
+      cancelable: true,
+      data: text,
+      inputType: append ? "insertText" : "insertReplacementText"
+    }));
+    element.dispatchEvent(new InputEvent("input", {
+      bubbles: true,
+      data: text,
+      inputType: append ? "insertText" : "insertReplacementText"
+    }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+    element.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true, key: "Enter" }));
+  }
+
+  function selectAllContent(element) {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }
+
+  function placeCaretAtEnd(element) {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }
+
+  function readInputValue(element) {
+    if (element instanceof HTMLTextAreaElement || element instanceof HTMLInputElement) {
+      return element.value || "";
+    }
+    return readRichText(element);
+  }
+
+  function normalizeForCompare(text) {
+    return String(text || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
   }
 
   function findFirstText(selectors) {

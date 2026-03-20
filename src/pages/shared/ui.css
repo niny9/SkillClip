@@ -214,6 +214,19 @@ p {
   border-radius: 999px;
 }
 
+.inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.45rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.inline-check input {
+  width: auto;
+}
+
 .checklist {
   display: grid;
   gap: 0.45rem;
@@ -500,6 +513,14 @@ p {
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(214, 203, 184, 0.8);
+}
+
+.source-turn-user {
+  border-left: 4px solid #c08a2b;
+}
+
+.source-turn-assistant {
+  border-left: 4px solid #1f6f5f;
 }
 
 .source-turn strong {

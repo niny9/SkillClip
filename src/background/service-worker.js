@@ -1,5 +1,5 @@
 import { compileSkillDraft, createVariantFromSkill, promoteDraftToSkill } from "../lib/compiler.js";
-import { extractSkillDraftWithApi, reviewSkillWithApi, testApiConnection } from "../lib/api-review.js";
+import { extractSkillDraftWithApi, reviewSkillWithApi, runSkillCheck, testApiConnection } from "../lib/api-review.js";
 import { MESSAGE_TYPES } from "../lib/constants.js";
 import { ensureContentScript } from "../lib/injection.js";
 import { validateSkillAsset } from "../lib/validator.js";
@@ -78,6 +78,8 @@ async function handleMessage(message, sender) {
       return compileConversationToDraft(message.payload);
     case MESSAGE_TYPES.COMPILE_CONVERSATION:
       return compileStoredConversation(message.payload.conversationId);
+    case MESSAGE_TYPES.COMPILE_SELECTIONS:
+      return compileSelectedConversations(message.payload.conversationIds || []);
     case MESSAGE_TYPES.GET_STATE:
       return getAllState();
     case MESSAGE_TYPES.INSERT_SKILL:
@@ -122,6 +124,8 @@ async function handleMessage(message, sender) {
       return getSettings();
     case MESSAGE_TYPES.TEST_API_CONNECTION:
       return testApiConnection(message.payload);
+    case MESSAGE_TYPES.RUN_SKILL_CHECK:
+      return runSkillCheckForAsset(message.payload);
     case MESSAGE_TYPES.RESET_STATE:
       return resetState();
     case MESSAGE_TYPES.SEED_DEMO:
@@ -195,6 +199,19 @@ async function compileStoredConversation(conversationId) {
     selectedText: source.selectedText || source.turns?.[0]?.text || "",
     turns: source.turns || []
   }, settings);
+}
+
+async function compileSelectedConversations(conversationIds) {
+  const state = await getAllState();
+  const sources = state.conversations.filter((item) => conversationIds.includes(item.id));
+  if (!sources.length) {
+    throw new Error("No source conversations selected");
+  }
+
+  const settings = await getSettings();
+  const payload = buildCombinedPayloadFromSources(sources);
+  const primaryMemory = sources[0];
+  return compileFromExistingMemory(primaryMemory, payload, settings);
 }
 
 async function promoteDraft(draftId) {
@@ -325,7 +342,8 @@ async function updateDraftItem(payload) {
     promptTemplate: payload.promptTemplate,
     outputFormat: payload.outputFormat,
     successCriteria: payload.successCriteria,
-    steps: payload.steps
+    steps: payload.steps,
+    stepSources: baseDraft.stepSources || []
   };
   const validated = await applyApiValidationIfNeeded({
     ...nextDraft,
@@ -371,7 +389,8 @@ async function updateSkillItem(payload) {
     promptTemplate: payload.promptTemplate,
     outputFormat: payload.outputFormat,
     successCriteria: payload.successCriteria,
-    steps: payload.steps
+    steps: payload.steps,
+    stepSources: baseSkill.stepSources || []
   };
   const validated = await applyApiValidationIfNeeded({
     ...nextSkill,
@@ -400,6 +419,7 @@ async function updateVariantItem(payload) {
     scenarioOverride: payload.scenario,
     promptTemplate: payload.promptTemplate,
     steps: payload.steps,
+    stepSources: variant.stepSources || [],
     updatedAt: nowIso()
   }));
   await broadcastStorageUpdate();
@@ -422,6 +442,20 @@ async function updateSettingsItem(payload) {
   const settings = await updateSettings(payload);
   await broadcastStorageUpdate();
   return settings;
+}
+
+async function runSkillCheckForAsset(payload) {
+  const settings = await getSettings();
+  const state = await getAllState();
+  const asset = state.skills.find((item) => item.id === payload.id)
+    || state.drafts.find((item) => item.id === payload.id)
+    || state.variants.find((item) => item.id === payload.id);
+
+  if (!asset) {
+    throw new Error("Asset not found for skill check");
+  }
+
+  return runSkillCheck(asset, settings);
 }
 
 async function applyApiValidationIfNeeded(asset, settings) {
@@ -461,6 +495,36 @@ async function compileFromExistingMemory(memory, payload, settings) {
   await insertDraft(draft);
   await broadcastStorageUpdate();
   return draft;
+}
+
+function buildCombinedPayloadFromSources(sources) {
+  const titles = sources
+    .map((item) => item.sourceTitle || item.selectedText || "")
+    .filter(Boolean)
+    .slice(0, 3);
+  const selectedText = sources
+    .map((item) => item.selectedText || "")
+    .filter(Boolean)
+    .join("\n\n---\n\n");
+  const turns = sources.flatMap((item) => (
+    (item.turns || []).map((turn) => ({
+      ...turn,
+      text: `[${item.sourceTitle || item.sourcePlatform || "source"}] ${turn.text}`
+    }))
+  ));
+  const platforms = Array.from(new Set(sources.map((item) => item.sourcePlatform).filter(Boolean)));
+
+  return {
+    platform: platforms.length === 1 ? platforms[0] : "mixed",
+    platforms,
+    url: sources[0]?.sourceUrl || "",
+    title: titles.join(" + ") || "Combined captured prompts",
+    model: sources[0]?.sourceModel || "",
+    selectedText,
+    turns,
+    conversationId: sources[0]?.id,
+    conversationIds: sources.map((item) => item.id)
+  };
 }
 
 async function broadcastStorageUpdate() {

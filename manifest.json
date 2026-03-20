@@ -19,6 +19,15 @@
     "https://gemini.google.com/*",
     "https://www.perplexity.ai/*",
     "https://chat.deepseek.com/*",
+    "https://kimi.moonshot.cn/*",
+    "https://www.kimi.com/*",
+    "https://kimi.com/*",
+    "https://www.doubao.com/*",
+    "https://doubao.com/*",
+    "https://yuanbao.tencent.com/*",
+    "https://tongyi.aliyun.com/*",
+    "https://qianwen.aliyun.com/*",
+    "https://copilot.microsoft.com/*",
     "https://open.bigmodel.cn/*"
   ],
   "background": {
@@ -57,7 +66,16 @@
         "https://claude.ai/*",
         "https://gemini.google.com/*",
         "https://www.perplexity.ai/*",
-        "https://chat.deepseek.com/*"
+        "https://chat.deepseek.com/*",
+        "https://kimi.moonshot.cn/*",
+        "https://www.kimi.com/*",
+        "https://kimi.com/*",
+        "https://www.doubao.com/*",
+        "https://doubao.com/*",
+        "https://yuanbao.tencent.com/*",
+        "https://tongyi.aliyun.com/*",
+        "https://qianwen.aliyun.com/*",
+        "https://copilot.microsoft.com/*"
       ],
       "js": [
         "src/content/content-script.js"

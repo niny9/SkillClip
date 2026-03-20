@@ -2,6 +2,8 @@ import { MESSAGE_TYPES } from "../../lib/constants.js";
 
 let latestState = null;
 let selectedDetail = null;
+let selectedConversationIds = new Set();
+let latestRunCheck = null;
 
 async function load() {
   const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_STATE });
@@ -10,10 +12,13 @@ async function load() {
 
   const activeConversations = state.conversations.filter((item) => !item.archivedAt);
   const activeSkills = state.skills.filter((item) => item.status !== "archived");
+  const activeConversationIds = new Set(activeConversations.map((item) => item.id));
+  selectedConversationIds = new Set(Array.from(selectedConversationIds).filter((id) => activeConversationIds.has(id)));
 
   renderList("[data-queue-raw]", activeConversations, renderConversation);
   renderSkills("[data-skills]", activeSkills, state.variants);
   renderVariants("[data-variants]", state.variants, state.skills);
+  renderSelectedCount();
 }
 
 function setFeedback(message) {
@@ -39,6 +44,36 @@ async function sendToActiveTab(message) {
     setFeedback("Action sent to active tab.");
   } catch (error) {
     setFeedback("Could not reach the active page. This tab may not allow injection yet.");
+  }
+}
+
+async function applySkillToActiveTab(skill) {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) {
+    setFeedback("No active tab found.");
+    return;
+  }
+
+  try {
+    await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.ENSURE_CONTENT_SCRIPT,
+      payload: { tabId: tab.id }
+    });
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: MESSAGE_TYPES.APPLY_SKILL,
+      payload: { skill }
+    });
+    if (response?.ok) {
+      await chrome.runtime.sendMessage({
+        type: MESSAGE_TYPES.INSERT_SKILL,
+        payload: { skillId: skill.id }
+      });
+      setFeedback(`Applied skill to current input / 已应用到当前输入框: ${skill.name}`);
+    } else {
+      setFeedback("Could not apply this skill to the current page.");
+    }
+  } catch (error) {
+    setFeedback("Could not reach the active page. Make sure an AI input is focused.");
   }
 }
 
@@ -95,6 +130,10 @@ function renderConversation(item) {
   return `
     <article class="list-card clickable-card queue-card queue-card-raw" data-detail-kind="conversation" data-detail-id="${item.id}">
       <strong>${escapeHtml(item.selectedText || item.sourceTitle || "Captured conversation")}</strong>
+      <label class="inline-check">
+        <input type="checkbox" data-select-conversation="${item.id}" ${selectedConversationIds.has(item.id) ? "checked" : ""} />
+        <span>Select / 选择</span>
+      </label>
       <span class="queue-badge">Raw capture / 原始素材</span>
       <span>Source / 来源: ${escapeHtml(item.sourcePlatform || "other")} · Mode / 方式: ${escapeHtml(item.captureMode)}</span>
       <div class="meta-block">
@@ -111,16 +150,19 @@ function renderConversation(item) {
 }
 
 function renderSkill(item, variantsForSkill = []) {
+  const platforms = (item.preferredForPlatforms || []).slice(0, 3).join(", ");
   return `
     <article class="list-card clickable-card" data-detail-kind="skill" data-detail-id="${item.id}">
       <strong>${escapeHtml(item.name)}</strong>
       <span>Ready Skill / 可复用技能 · ${escapeHtml(item.scenario || "Reusable workflow")} · Used ${item.usageCount || 0} times</span>
       <div class="meta-block">
+        ${platforms ? `<small>Platforms / 平台: ${escapeHtml(platforms)}</small>` : ""}
         <small>Variants / 变体数: ${variantsForSkill.length}</small>
         ${variantsForSkill.length ? variantsForSkill.map((variant) => `<small>${escapeHtml(variant.name)}</small>`).join("") : "<small>No variants yet.</small>"}
       </div>
       <div class="action-row">
         <button type="button" data-action="edit-skill" data-id="${item.id}">Edit / 编辑</button>
+        <button type="button" data-action="apply-skill" data-id="${item.id}">Apply Now / 立即应用</button>
         <button type="button" data-action="create-variant" data-id="${item.id}">Create Alternative / 新建优化版</button>
         <button type="button" data-action="delete-skill" data-id="${item.id}">Delete / 删除</button>
       </div>
@@ -129,11 +171,13 @@ function renderSkill(item, variantsForSkill = []) {
 }
 
 function renderVariant(item, baseSkill) {
+  const platforms = (baseSkill?.preferredForPlatforms || []).slice(0, 3).join(", ");
   return `
     <article class="list-card clickable-card" data-detail-kind="variant" data-detail-id="${item.id}">
       <strong>${escapeHtml(item.name)}</strong>
       <span>Alternative / 优化版本 · For Skill / 所属技能: ${escapeHtml(baseSkill?.name || item.baseSkillId)}</span>
       <div class="meta-block">
+        ${platforms ? `<small>Platforms / 平台: ${escapeHtml(platforms)}</small>` : ""}
         <small>${escapeHtml(item.changeSummary || "Variant")}</small>
       </div>
       <div class="action-row">
@@ -213,6 +257,7 @@ function showDetailPanel(item, kind) {
   }
 
   selectedDetail = { id: item.id, kind };
+  latestRunCheck = null;
   updateSelectedCards();
   if (title) {
     const kindLabel = kind === "conversation"
@@ -245,6 +290,8 @@ function showDetailPanel(item, kind) {
     renderPromptMeta(item);
     renderExtractionPreview(null);
     renderValidationPreview(null);
+    renderRunCheckPreview(null);
+    renderStepMapPreview(null, item.turns || []);
     renderVariantCompare(item, kind);
     renderSourcePreview(item);
     return;
@@ -262,6 +309,8 @@ function showDetailPanel(item, kind) {
   form.elements.successCriteria.value = (item.successCriteria || []).join("\n");
   renderExtractionPreview(item.extraction);
   renderValidationPreview(kind === "variant" ? null : item.validation);
+  renderRunCheckPreview(null);
+  renderStepMapPreview(item.stepSources || [], item.steps || []);
   renderVariantCompare(item, kind);
   renderSourcePreview(item);
 }
@@ -277,6 +326,10 @@ function hideDetailPanel() {
   const extractionContent = document.querySelector("[data-extraction-content]");
   const validationPanel = document.querySelector("[data-validation-panel]");
   const validationContent = document.querySelector("[data-validation-content]");
+  const runCheckPanel = document.querySelector("[data-run-check-panel]");
+  const runCheckContent = document.querySelector("[data-run-check-content]");
+  const stepMapPanel = document.querySelector("[data-step-map-panel]");
+  const stepMapContent = document.querySelector("[data-step-map-content]");
   const comparePanel = document.querySelector("[data-compare-panel]");
   const compareContent = document.querySelector("[data-compare-content]");
   const title = document.querySelector("[data-detail-title]");
@@ -316,12 +369,87 @@ function hideDetailPanel() {
   if (validationContent) {
     validationContent.innerHTML = "";
   }
+  if (runCheckPanel) {
+    runCheckPanel.hidden = true;
+  }
+  if (runCheckContent) {
+    runCheckContent.innerHTML = "";
+  }
+  if (stepMapPanel) {
+    stepMapPanel.hidden = true;
+  }
+  if (stepMapContent) {
+    stepMapContent.innerHTML = "";
+  }
   if (comparePanel) {
     comparePanel.hidden = true;
   }
   if (compareContent) {
     compareContent.innerHTML = "";
   }
+}
+
+function renderRunCheckPreview(result) {
+  const panel = document.querySelector("[data-run-check-panel]");
+  const content = document.querySelector("[data-run-check-content]");
+  if (!panel || !content) {
+    return;
+  }
+
+  if (!result) {
+    panel.hidden = true;
+    content.innerHTML = "";
+    return;
+  }
+
+  panel.hidden = false;
+  const issues = result.issues?.length
+    ? `<ul class="detail-list">${result.issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join("")}</ul>`
+    : "<p class='muted'>No blocking issues reported.</p>";
+
+  content.innerHTML = `
+    <article class="list-card">
+      <strong>${escapeHtml(result.ok ? "Usable / 可用" : "Needs Work / 需继续优化")}</strong>
+      <span>${escapeHtml(result.summary || "")}</span>
+      ${result.checkedAt ? `<p class="muted">Checked at / 检查时间: ${escapeHtml(result.checkedAt)}</p>` : ""}
+      ${result.outputPreview ? `<div class="meta-block"><small>Output preview / 输出预览</small><small>${escapeHtml(result.outputPreview.slice(0, 800))}</small></div>` : ""}
+      ${issues}
+    </article>
+  `;
+}
+
+function renderStepMapPreview(stepSources, fallbackItems = []) {
+  const panel = document.querySelector("[data-step-map-panel]");
+  const content = document.querySelector("[data-step-map-content]");
+  if (!panel || !content) {
+    return;
+  }
+
+  if (!Array.isArray(stepSources) || stepSources.length === 0) {
+    if (!Array.isArray(fallbackItems) || fallbackItems.length === 0) {
+      panel.hidden = true;
+      content.innerHTML = "";
+      return;
+    }
+
+    panel.hidden = false;
+    content.innerHTML = `
+      <ul class="detail-list">
+        ${fallbackItems.map((item, index) => `<li>${index + 1}. ${escapeHtml(item.text || item)}</li>`).join("")}
+      </ul>
+    `;
+    return;
+  }
+
+  panel.hidden = false;
+  content.innerHTML = stepSources.map((item, index) => `
+    <article class="list-card">
+      <strong>Step ${index + 1}</strong>
+      <span>${escapeHtml(item.step || "")}</span>
+      ${item.sourceTurnIds?.length ? `<div class="action-row">${item.sourceTurnIds.map((turnId) => `<button type="button" data-action="jump-to-turn" data-turn-id="${escapeHtml(turnId)}">Jump to ${escapeHtml(turnId)}</button>`).join("")}</div>` : ""}
+      ${item.sourcePreview ? `<div class="meta-block"><small>Source preview / 来源摘要</small><small>${escapeHtml(item.sourcePreview)}</small></div>` : ""}
+    </article>
+  `).join("");
 }
 
 function renderPromptMeta(item) {
@@ -469,15 +597,22 @@ function renderSourcePreview(item) {
   }
 
   sourcePanel.hidden = false;
-  sourceContent.innerHTML = sources.slice(0, 1).map(renderSourceCard).join("");
+  sourceContent.innerHTML = sources.slice(0, 3).map(renderSourceCard).join("");
+}
+
+function renderSelectedCount() {
+  const node = document.querySelector("[data-selected-count]");
+  if (node) {
+    node.textContent = `Selected / 已选择: ${selectedConversationIds.size}`;
+  }
 }
 
 function renderSourceCard(source) {
   const turnsPreview = (source.turns || [])
-    .slice(0, 4)
+    .slice(0, 8)
     .map((turn) => `
-      <div class="source-turn">
-        <strong>${escapeHtml(turn.role || "unknown")}</strong>
+      <div class="source-turn source-turn-${escapeHtml(turn.role || "unknown")}" data-turn-id="${escapeHtml(turn.id || "")}">
+        <strong>${escapeHtml(turn.role || "unknown")} · Turn / 第${escapeHtml(String((source.turns || []).indexOf(turn) + 1))}轮</strong>
         <span>${escapeHtml(turn.text || "")}</span>
       </div>
     `)
@@ -490,9 +625,9 @@ function renderSourceCard(source) {
       <span>Mode / 方式: ${escapeHtml(source.captureMode || "unknown")}</span>
       ${source.selectedText ? `<div class="meta-block"><small>Selected text / 选中文本</small><small>${escapeHtml(source.selectedText.slice(0, 180))}</small></div>` : ""}
       <details class="raw-json-wrap">
-        <summary>View source details / 查看原始细节</summary>
+        <summary>View full source timeline / 查看完整来源时间线</summary>
         <div class="meta-block"><small>URL</small><small>${escapeHtml(source.sourceUrl || "")}</small></div>
-        ${turnsPreview ? `<div class="source-turns"><small>Conversation preview / 对话预览</small>${turnsPreview}</div>` : ""}
+        ${turnsPreview ? `<div class="source-turns"><small>Conversation timeline / 对话时间线</small>${turnsPreview}</div>` : ""}
       </details>
       <div class="action-row">
         <button type="button" data-action="re-save-source-prompt" data-source-id="${source.id}">Save Source as Prompt / 另存为 Prompt</button>
@@ -565,6 +700,25 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
+  if (action === "compile-selected") {
+    if (selectedConversationIds.size === 0) {
+      setFeedback("Select at least one prompt first / 请先选择至少一条 Prompt。");
+      return;
+    }
+
+    const response = await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.COMPILE_SELECTIONS,
+      payload: { conversationIds: Array.from(selectedConversationIds) }
+    });
+    const draft = response?.result || null;
+    await load();
+    if (draft) {
+      showDetailPanel(draft, "draft");
+      setFeedback("Combined skill draft created from selected prompts / 已根据选中的 Prompt 生成技能草稿。");
+    }
+    return;
+  }
+
   if (action === "edit-conversation-draft" && id) {
     await openConversationDraftDetail(id);
     return;
@@ -589,6 +743,36 @@ document.addEventListener("click", async (event) => {
     if (item) {
       showDetailPanel(item, "skill");
     }
+    return;
+  }
+
+  if (action === "apply-skill" && id) {
+    const item = latestState?.skills.find((skill) => skill.id === id);
+    if (item) {
+      await applySkillToActiveTab(item);
+    }
+    return;
+  }
+
+  if (action === "run-skill-check") {
+    if (!selectedDetail || selectedDetail.kind === "conversation") {
+      setFeedback("Select a draft, skill, or variant first.");
+      return;
+    }
+    renderRunCheckPreview({
+      ok: false,
+      summary: "Running live skill check...",
+      outputPreview: "",
+      issues: [],
+      checkedAt: ""
+    });
+    const response = await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.RUN_SKILL_CHECK,
+      payload: { id: selectedDetail.id }
+    });
+    latestRunCheck = response?.result || null;
+    renderRunCheckPreview(latestRunCheck);
+    setFeedback("Skill check finished.");
     return;
   }
 
@@ -669,7 +853,35 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
+  if (action === "jump-to-turn") {
+    const turnId = target.dataset.turnId;
+    const turnNode = turnId ? document.querySelector(`[data-turn-id="${CSS.escape(turnId)}"]`) : null;
+    const detail = turnNode?.closest("details");
+    if (detail instanceof HTMLDetailsElement) {
+      detail.open = true;
+    }
+    turnNode?.scrollIntoView({ behavior: "smooth", block: "center" });
+    turnNode?.classList.add("selected-card");
+    window.setTimeout(() => turnNode?.classList.remove("selected-card"), 1200);
+    return;
+  }
+
   if (target.closest("button")) {
+    return;
+  }
+
+  if (target.closest(".inline-check")) {
+    return;
+  }
+
+  const checkbox = target.closest("[data-select-conversation]");
+  if (checkbox instanceof HTMLInputElement) {
+    if (checkbox.checked) {
+      selectedConversationIds.add(checkbox.dataset.selectConversation);
+    } else {
+      selectedConversationIds.delete(checkbox.dataset.selectConversation);
+    }
+    renderSelectedCount();
     return;
   }
 
@@ -719,6 +931,22 @@ document.addEventListener("click", async (event) => {
         steps: item.steps || []
       }, "variant");
     }
+  }
+});
+
+document.addEventListener("change", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) {
+    return;
+  }
+
+  if (target.dataset.selectConversation) {
+    if (target.checked) {
+      selectedConversationIds.add(target.dataset.selectConversation);
+    } else {
+      selectedConversationIds.delete(target.dataset.selectConversation);
+    }
+    renderSelectedCount();
   }
 });
 
@@ -778,6 +1006,3 @@ document.querySelector("[data-prompt-form]")?.addEventListener("submit", async (
 });
 
 load();
-  if (promptMeta) {
-    promptMeta.innerHTML = "";
-  }

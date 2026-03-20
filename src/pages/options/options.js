@@ -13,7 +13,13 @@ const SUPPORTED_HOSTS = [
   "www.perplexity.ai",
   "kimi.moonshot.cn",
   "www.kimi.com",
-  "kimi.com"
+  "kimi.com",
+  "www.doubao.com",
+  "doubao.com",
+  "yuanbao.tencent.com",
+  "tongyi.aliyun.com",
+  "qianwen.aliyun.com",
+  "copilot.microsoft.com"
 ];
 
 async function load() {
@@ -402,6 +408,18 @@ function hostnameToPlatformLabel(hostname) {
   }
   if (hostname.includes("moonshot") || hostname.includes("kimi")) {
     return "Kimi";
+  }
+  if (hostname.includes("doubao")) {
+    return "Doubao";
+  }
+  if (hostname.includes("yuanbao")) {
+    return "Yuanbao";
+  }
+  if (hostname.includes("tongyi") || hostname.includes("qianwen")) {
+    return "Qwen";
+  }
+  if (hostname.includes("copilot")) {
+    return "Copilot";
   }
   return hostname;
 }
