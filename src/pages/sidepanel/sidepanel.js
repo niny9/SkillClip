@@ -4,6 +4,7 @@ let latestState = null;
 let selectedDetail = null;
 let selectedConversationIds = new Set();
 let latestRunCheck = null;
+let selectedWorkflowPrompt = null;
 
 async function load() {
   const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_STATE });
@@ -258,6 +259,7 @@ function showDetailPanel(item, kind) {
 
   selectedDetail = { id: item.id, kind };
   latestRunCheck = null;
+  renderWorkflowPromptEditor(null);
   updateSelectedCards();
   if (title) {
     const kindLabel = kind === "conversation"
@@ -288,6 +290,7 @@ function showDetailPanel(item, kind) {
     promptForm.elements.sourceTitle.value = item.sourceTitle || "";
     promptForm.elements.selectedText.value = item.selectedText || item.turns?.[0]?.text || "";
     renderPromptMeta(item);
+    renderOptimizedPrompt(item);
     renderExtractionPreview(null);
     renderValidationPreview(null);
     renderRunCheckPreview(null);
@@ -311,6 +314,7 @@ function showDetailPanel(item, kind) {
   renderValidationPreview(kind === "variant" ? null : item.validation);
   renderRunCheckPreview(null);
   renderStepMapPreview(item.stepSources || [], item.steps || []);
+  renderWorkflowPromptsPreview(item.workflowPrompts || []);
   renderVariantCompare(item, kind);
   renderSourcePreview(item);
 }
@@ -322,6 +326,8 @@ function hideDetailPanel() {
   const empty = document.querySelector("[data-detail-empty]");
   const sourcePanel = document.querySelector("[data-source-panel]");
   const sourceContent = document.querySelector("[data-source-content]");
+  const optimizedPanel = document.querySelector("[data-optimized-prompt-panel]");
+  const optimizedContent = document.querySelector("[data-optimized-prompt-content]");
   const extractionPanel = document.querySelector("[data-extraction-panel]");
   const extractionContent = document.querySelector("[data-extraction-content]");
   const validationPanel = document.querySelector("[data-validation-panel]");
@@ -330,6 +336,11 @@ function hideDetailPanel() {
   const runCheckContent = document.querySelector("[data-run-check-content]");
   const stepMapPanel = document.querySelector("[data-step-map-panel]");
   const stepMapContent = document.querySelector("[data-step-map-content]");
+  const workflowPromptsPanel = document.querySelector("[data-workflow-prompts-panel]");
+  const workflowPromptsContent = document.querySelector("[data-workflow-prompts-content]");
+  const workflowEditorPanel = document.querySelector("[data-workflow-editor-panel]");
+  const workflowPromptForm = document.querySelector("[data-workflow-prompt-form]");
+  const workflowPromptCheck = document.querySelector("[data-workflow-prompt-check]");
   const comparePanel = document.querySelector("[data-compare-panel]");
   const compareContent = document.querySelector("[data-compare-content]");
   const title = document.querySelector("[data-detail-title]");
@@ -339,6 +350,7 @@ function hideDetailPanel() {
   }
 
   selectedDetail = null;
+  selectedWorkflowPrompt = null;
   updateSelectedCards();
   promptForm.hidden = true;
   promptForm.reset();
@@ -356,6 +368,12 @@ function hideDetailPanel() {
   }
   if (sourceContent) {
     sourceContent.innerHTML = "";
+  }
+  if (optimizedPanel) {
+    optimizedPanel.hidden = true;
+  }
+  if (optimizedContent) {
+    optimizedContent.innerHTML = "";
   }
   if (extractionPanel) {
     extractionPanel.hidden = true;
@@ -381,12 +399,129 @@ function hideDetailPanel() {
   if (stepMapContent) {
     stepMapContent.innerHTML = "";
   }
+  if (workflowPromptsPanel) {
+    workflowPromptsPanel.hidden = true;
+  }
+  if (workflowPromptsContent) {
+    workflowPromptsContent.innerHTML = "";
+  }
+  if (workflowEditorPanel) {
+    workflowEditorPanel.hidden = true;
+  }
+  if (workflowPromptForm) {
+    workflowPromptForm.reset();
+  }
+  if (workflowPromptCheck) {
+    workflowPromptCheck.innerHTML = "";
+  }
   if (comparePanel) {
     comparePanel.hidden = true;
   }
   if (compareContent) {
     compareContent.innerHTML = "";
   }
+}
+
+function renderOptimizedPrompt(item) {
+  const panel = document.querySelector("[data-optimized-prompt-panel]");
+  const content = document.querySelector("[data-optimized-prompt-content]");
+  if (!panel || !content) {
+    return;
+  }
+
+  if (!item.optimizedPrompt) {
+    panel.hidden = true;
+    content.innerHTML = "";
+    return;
+  }
+
+  panel.hidden = false;
+  content.innerHTML = `
+    <article class="list-card">
+      <strong>${escapeHtml(item.optimizedTitle || "Optimized Prompt")}</strong>
+      ${item.inferredScenario ? `<span>${escapeHtml(item.inferredScenario)}</span>` : ""}
+      <div class="meta-block">
+        <small>${escapeHtml(item.optimizedPrompt)}</small>
+      </div>
+    </article>
+  `;
+}
+
+function renderWorkflowPromptsPreview(items) {
+  const panel = document.querySelector("[data-workflow-prompts-panel]");
+  const content = document.querySelector("[data-workflow-prompts-content]");
+  if (!panel || !content) {
+    return;
+  }
+
+  if (!Array.isArray(items) || items.length === 0) {
+    panel.hidden = true;
+    content.innerHTML = "";
+    return;
+  }
+
+  panel.hidden = false;
+  content.innerHTML = items.map((item, index) => `
+    <article class="list-card">
+      <strong>Prompt ${index + 1} · ${escapeHtml(item.title || `Prompt ${index + 1}`)}</strong>
+      <span>${escapeHtml(item.prompt || "")}</span>
+      <div class="meta-block">
+        <small>Maps to step / 对应步骤: ${index + 1}</small>
+        ${item.quality ? `<small>Quality / 质量分: ${escapeHtml(String(item.quality.score))} · Priority / 优先级: ${escapeHtml(item.quality.priority)}</small>` : ""}
+        ${item.sourceTurnIds?.length ? `<small>Source turns / 来源轮次: ${escapeHtml(item.sourceTurnIds.join(", "))}</small>` : "<small>No linked source turns yet.</small>"}
+      </div>
+      <div class="action-row">
+        <button type="button" data-action="edit-workflow-prompt" data-index="${index}">Edit / 编辑</button>
+        <button type="button" data-action="optimize-workflow-prompt-inline" data-index="${index}">Optimize / 一键优化</button>
+        <button type="button" data-action="run-workflow-prompt-check" data-index="${index}">Run Prompt Check / 检查这条 Prompt</button>
+      </div>
+      ${item.sourceTurnIds?.length ? `<div class="action-row">${item.sourceTurnIds.map((turnId) => `<button type="button" data-action="jump-to-turn" data-turn-id="${escapeHtml(turnId)}">Jump to ${escapeHtml(turnId)}</button>`).join("")}</div>` : ""}
+    </article>
+  `).join("");
+}
+
+function renderWorkflowPromptEditor(item, index, promptCheck = null) {
+  const panel = document.querySelector("[data-workflow-editor-panel]");
+  const form = document.querySelector("[data-workflow-prompt-form]");
+  const checkNode = document.querySelector("[data-workflow-prompt-check]");
+  if (!panel || !form || !checkNode) {
+    return;
+  }
+
+  if (!item) {
+    selectedWorkflowPrompt = null;
+    panel.hidden = true;
+    form.reset();
+    checkNode.innerHTML = "";
+    return;
+  }
+
+  selectedWorkflowPrompt = { index };
+  panel.hidden = false;
+  form.elements.index.value = String(index);
+  form.elements.title.value = item.title || "";
+  form.elements.prompt.value = item.prompt || "";
+  checkNode.innerHTML = promptCheck
+    ? `
+      <article class="list-card">
+        <strong>${escapeHtml(promptCheck.ok ? "Usable / 可用" : "Needs Work / 需继续优化")}</strong>
+        <span>${escapeHtml(promptCheck.summary || "")}</span>
+        ${(Array.isArray(promptCheck.issues) && promptCheck.issues.length)
+          ? `<div class="meta-block"><small>${escapeHtml(promptCheck.issues.join(" | "))}</small></div>`
+          : "<p class='muted'>No prompt-level issues reported.</p>"}
+      </article>
+    `
+    : `
+      <div class="meta-block">
+        ${item.quality ? `<small>Quality / 质量分: ${escapeHtml(String(item.quality.score))} · Priority / 优先级: ${escapeHtml(item.quality.priority)}</small>` : ""}
+        ${(Array.isArray(item.quality?.issues) && item.quality.issues.length)
+          ? `<small>${escapeHtml(item.quality.issues.join(" | "))}</small>`
+          : "<small>No quality warnings.</small>"}
+      </div>
+      ${(item.previousPrompt || item.previousTitle)
+        ? `<details class="raw-json-wrap"><summary>Previous Version / 上一版本</summary><div class="meta-block"><small>${escapeHtml(item.previousTitle || "")}</small><small>${escapeHtml(item.previousPrompt || "")}</small></div></details>`
+        : "<p class='muted'>Edit one workflow prompt here, then save or run a single prompt check.</p>"}
+    `;
 }
 
 function renderRunCheckPreview(result) {
@@ -406,6 +541,25 @@ function renderRunCheckPreview(result) {
   const issues = result.issues?.length
     ? `<ul class="detail-list">${result.issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join("")}</ul>`
     : "<p class='muted'>No blocking issues reported.</p>";
+  const promptChecks = Array.isArray(result.promptChecks) && result.promptChecks.length
+    ? `
+      <div class="meta-block">
+        <small>Workflow prompt checks / 工作流 Prompt 检查</small>
+      </div>
+      ${result.promptChecks.map((item, index) => `
+        <article class="list-card">
+          <strong>Prompt ${index + 1} · ${escapeHtml(item.title || `Prompt ${index + 1}`)}</strong>
+          <span>${escapeHtml(item.ok ? "Usable / 可用" : "Needs Work / 需继续优化")}</span>
+          <div class="meta-block">
+            <small>${escapeHtml(item.summary || "")}</small>
+            ${(Array.isArray(item.issues) && item.issues.length)
+              ? `<small>${escapeHtml(item.issues.join(" | "))}</small>`
+              : "<small>No prompt-level issues reported.</small>"}
+          </div>
+        </article>
+      `).join("")}
+    `
+    : "";
 
   content.innerHTML = `
     <article class="list-card">
@@ -415,6 +569,7 @@ function renderRunCheckPreview(result) {
       ${result.outputPreview ? `<div class="meta-block"><small>Output preview / 输出预览</small><small>${escapeHtml(result.outputPreview.slice(0, 800))}</small></div>` : ""}
       ${issues}
     </article>
+    ${promptChecks}
   `;
 }
 
@@ -657,6 +812,24 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function getCurrentDetailAsset() {
+  if (!selectedDetail || !latestState) {
+    return null;
+  }
+
+  if (selectedDetail.kind === "draft") {
+    return latestState.drafts.find((item) => item.id === selectedDetail.id) || null;
+  }
+  if (selectedDetail.kind === "skill") {
+    return latestState.skills.find((item) => item.id === selectedDetail.id) || null;
+  }
+  if (selectedDetail.kind === "variant") {
+    return latestState.variants.find((item) => item.id === selectedDetail.id) || null;
+  }
+
+  return null;
+}
+
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === MESSAGE_TYPES.STORAGE_UPDATED) {
     load();
@@ -776,6 +949,137 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
+  if (action === "edit-workflow-prompt") {
+    if (!selectedDetail || selectedDetail.kind === "conversation") {
+      setFeedback("Select a draft, skill, or variant first.");
+      return;
+    }
+    const asset = getCurrentDetailAsset();
+    const index = Number(target.dataset.index);
+    const prompt = asset?.workflowPrompts?.[index];
+    if (!prompt) {
+      setFeedback("Workflow prompt not found.");
+      return;
+    }
+    renderWorkflowPromptEditor(prompt, index);
+    setFeedback("Workflow prompt opened for editing.");
+    return;
+  }
+
+  if (action === "run-workflow-prompt-check") {
+    if (!selectedDetail || selectedDetail.kind === "conversation") {
+      setFeedback("Select a draft, skill, or variant first.");
+      return;
+    }
+    const asset = getCurrentDetailAsset();
+    const index = Number(target.dataset.index ?? selectedWorkflowPrompt?.index);
+    if (!Number.isInteger(index) || index < 0) {
+      setFeedback("Choose a workflow prompt first.");
+      return;
+    }
+    const prompt = asset?.workflowPrompts?.[index];
+    if (!prompt) {
+      setFeedback("Workflow prompt not found.");
+      return;
+    }
+    renderWorkflowPromptEditor(prompt, index, {
+      ok: false,
+      summary: "Running single prompt check...",
+      issues: []
+    });
+    const response = await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.RUN_WORKFLOW_PROMPT_CHECK,
+      payload: { id: selectedDetail.id, index }
+    });
+    renderWorkflowPromptEditor(prompt, index, response?.result || null);
+    setFeedback("Workflow prompt check finished.");
+    return;
+  }
+
+  if (action === "optimize-workflow-prompt") {
+    if (!selectedDetail || selectedDetail.kind === "conversation") {
+      setFeedback("Select a draft, skill, or variant first.");
+      return;
+    }
+    const index = Number(selectedWorkflowPrompt?.index);
+    if (!Number.isInteger(index) || index < 0) {
+      setFeedback("Choose a workflow prompt first.");
+      return;
+    }
+    const asset = getCurrentDetailAsset();
+    const prompt = asset?.workflowPrompts?.[index];
+    if (!prompt) {
+      setFeedback("Workflow prompt not found.");
+      return;
+    }
+    renderWorkflowPromptEditor(prompt, index, {
+      ok: false,
+      summary: "Optimizing workflow prompt...",
+      issues: []
+    });
+    const response = await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.OPTIMIZE_WORKFLOW_PROMPT,
+      payload: { id: selectedDetail.id, kind: selectedDetail.kind, index }
+    });
+    await load();
+    const nextAsset = getCurrentDetailAsset();
+    const nextPrompt = nextAsset?.workflowPrompts?.[index];
+    if (nextAsset) {
+      showDetailPanel(nextAsset, selectedDetail.kind);
+    }
+    if (nextPrompt) {
+      renderWorkflowPromptEditor(nextPrompt, index, {
+        ok: true,
+        summary: "Workflow prompt optimized.",
+        issues: []
+      });
+    }
+    setFeedback("Workflow prompt optimized.");
+    return;
+  }
+
+  if (action === "optimize-workflow-prompt-inline") {
+    if (!selectedDetail || selectedDetail.kind === "conversation") {
+      setFeedback("Select a draft, skill, or variant first.");
+      return;
+    }
+    const index = Number(target.dataset.index);
+    if (!Number.isInteger(index) || index < 0) {
+      setFeedback("Workflow prompt not found.");
+      return;
+    }
+    const asset = getCurrentDetailAsset();
+    const prompt = asset?.workflowPrompts?.[index];
+    if (!prompt) {
+      setFeedback("Workflow prompt not found.");
+      return;
+    }
+    renderWorkflowPromptEditor(prompt, index, {
+      ok: false,
+      summary: "Optimizing workflow prompt...",
+      issues: []
+    });
+    const response = await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.OPTIMIZE_WORKFLOW_PROMPT,
+      payload: { id: selectedDetail.id, kind: selectedDetail.kind, index }
+    });
+    await load();
+    const nextAsset = getCurrentDetailAsset();
+    const nextPrompt = nextAsset?.workflowPrompts?.[index];
+    if (nextAsset) {
+      showDetailPanel(nextAsset, selectedDetail.kind);
+    }
+    if (nextPrompt) {
+      renderWorkflowPromptEditor(nextPrompt, index, response?.result ? {
+        ok: true,
+        summary: "Workflow prompt optimized.",
+        issues: []
+      } : null);
+    }
+    setFeedback("Workflow prompt optimized.");
+    return;
+  }
+
   if (action === "delete-variant" && id) {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.DELETE_VARIANT, payload: { variantId: id } });
     setFeedback("Variant deleted.");
@@ -827,6 +1131,11 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
+  if (action === "clear-workflow-editor") {
+    renderWorkflowPromptEditor(null);
+    return;
+  }
+
   if (action === "re-save-source-prompt") {
     const sourceId = target.dataset.sourceId;
     const source = latestState?.conversations.find((item) => item.id === sourceId);
@@ -849,6 +1158,23 @@ document.addEventListener("click", async (event) => {
         payload: buildPayloadFromConversation(source)
       });
       setFeedback("Source recompiled into a draft.");
+    }
+    return;
+  }
+
+  if (action === "optimize-conversation") {
+    if (!selectedDetail || selectedDetail.kind !== "conversation") {
+      setFeedback("Select a raw prompt first.");
+      return;
+    }
+    const response = await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.OPTIMIZE_CONVERSATION,
+      payload: { conversationId: selectedDetail.id }
+    });
+    if (response?.result) {
+      renderOptimizedPrompt(response.result);
+      setFeedback("Prompt optimized.");
+      await load();
     }
     return;
   }
@@ -1003,6 +1329,38 @@ document.querySelector("[data-prompt-form]")?.addEventListener("submit", async (
     }
   });
   setFeedback("Prompt updated.");
+});
+
+document.querySelector("[data-workflow-prompt-form]")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!selectedDetail || selectedDetail.kind === "conversation") {
+    setFeedback("Select a draft, skill, or variant first.");
+    return;
+  }
+
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+  const index = Number(formData.get("index"));
+  await chrome.runtime.sendMessage({
+    type: MESSAGE_TYPES.UPDATE_WORKFLOW_PROMPT,
+    payload: {
+      id: selectedDetail.id,
+      kind: selectedDetail.kind,
+      index,
+      title: String(formData.get("title") || ""),
+      prompt: String(formData.get("prompt") || "")
+    }
+  });
+  await load();
+  const asset = getCurrentDetailAsset();
+  const prompt = asset?.workflowPrompts?.[index];
+  if (asset) {
+    showDetailPanel(asset, selectedDetail.kind);
+  }
+  if (prompt) {
+    renderWorkflowPromptEditor(prompt, index);
+  }
+  setFeedback("Workflow prompt updated.");
 });
 
 load();

@@ -339,10 +339,10 @@ function populateSettings(settings) {
   const openWorkspaceAfterCapture = document.querySelector("[data-setting='openWorkspaceAfterCapture']");
 
   if (provider) {
-    provider.value = settings.apiProvider || "custom";
+    provider.value = settings.apiProvider || "zhipu";
   }
   if (mode) {
-    mode.value = settings.validationMode || "local";
+    mode.value = settings.validationMode || "api";
   }
   if (apiBaseUrl) {
     apiBaseUrl.value = settings.apiBaseUrl || "";
@@ -607,14 +607,14 @@ async function restoreAsset(kind, id) {
 }
 
 function collectSettingsFromForm() {
-  const provider = document.querySelector("[data-setting='apiProvider']")?.value || "custom";
+  const provider = document.querySelector("[data-setting='apiProvider']")?.value || "zhipu";
   const baseUrlInput = document.querySelector("[data-setting='apiBaseUrl']");
   const modelInput = document.querySelector("[data-setting='apiModel']");
   const keyInput = document.querySelector("[data-setting='apiKey']");
   const resolvedBaseUrl = baseUrlInput?.value.trim() || getSuggestedBaseUrl(provider);
 
   return {
-    validationMode: document.querySelector("[data-setting='validationMode']")?.value || "local",
+    validationMode: document.querySelector("[data-setting='validationMode']")?.value || "api",
     apiProvider: provider,
     apiBaseUrl: resolvedBaseUrl,
     apiModel: modelInput?.value.trim() || "",

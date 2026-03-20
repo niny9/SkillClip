@@ -1,5 +1,5 @@
-import { compileSkillDraft, createVariantFromSkill, promoteDraftToSkill } from "../lib/compiler.js";
-import { extractSkillDraftWithApi, reviewSkillWithApi, runSkillCheck, testApiConnection } from "../lib/api-review.js";
+import { buildSkillStructureFromWorkflowPrompts, compileSkillDraft, createVariantFromSkill, optimizePromptLocally, optimizeWorkflowPromptLocally, promoteDraftToSkill } from "../lib/compiler.js";
+import { extractSkillDraftWithApi, optimizePromptWithApi, optimizeWorkflowPromptWithApi, optimizeWorkflowTurnsWithApi, reviewSkillWithApi, runSkillCheck, runWorkflowPromptCheck, testApiConnection } from "../lib/api-review.js";
 import { MESSAGE_TYPES } from "../lib/constants.js";
 import { ensureContentScript } from "../lib/injection.js";
 import { validateSkillAsset } from "../lib/validator.js";
@@ -74,6 +74,12 @@ async function handleMessage(message, sender) {
       return saveCapturedItem(message.payload, "selection");
     case MESSAGE_TYPES.SAVE_FLOW:
       return saveCapturedItem(message.payload, "whole_flow");
+    case MESSAGE_TYPES.OPTIMIZE_CONVERSATION:
+      return optimizeConversationPrompt(message.payload.conversationId);
+    case MESSAGE_TYPES.OPTIMIZE_WORKFLOW_PROMPT:
+      return optimizeWorkflowPromptItem(message.payload);
+    case MESSAGE_TYPES.UPDATE_WORKFLOW_PROMPT:
+      return updateWorkflowPromptItem(message.payload);
     case MESSAGE_TYPES.COMPILE_SKILL:
       return compileConversationToDraft(message.payload);
     case MESSAGE_TYPES.COMPILE_CONVERSATION:
@@ -126,6 +132,8 @@ async function handleMessage(message, sender) {
       return testApiConnection(message.payload);
     case MESSAGE_TYPES.RUN_SKILL_CHECK:
       return runSkillCheckForAsset(message.payload);
+    case MESSAGE_TYPES.RUN_WORKFLOW_PROMPT_CHECK:
+      return runWorkflowPromptCheckForAsset(message.payload);
     case MESSAGE_TYPES.RESET_STATE:
       return resetState();
     case MESSAGE_TYPES.SEED_DEMO:
@@ -194,10 +202,10 @@ async function compileStoredConversation(conversationId) {
   return compileFromExistingMemory(source, {
     platform: source.sourcePlatform,
     url: source.sourceUrl,
-    title: source.sourceTitle,
+    title: source.optimizedTitle || source.sourceTitle,
     model: source.sourceModel,
-    selectedText: source.selectedText || source.turns?.[0]?.text || "",
-    turns: source.turns || []
+    selectedText: source.optimizedPrompt || source.selectedText || source.turns?.[0]?.text || "",
+    turns: applyOptimizedTurns(source) || source.turns || []
   }, settings);
 }
 
@@ -212,6 +220,34 @@ async function compileSelectedConversations(conversationIds) {
   const payload = buildCombinedPayloadFromSources(sources);
   const primaryMemory = sources[0];
   return compileFromExistingMemory(primaryMemory, payload, settings);
+}
+
+async function optimizeConversationPrompt(conversationId) {
+  const settings = await getSettings();
+  const conversation = await findConversationById(conversationId);
+  if (!conversation) {
+    throw new Error("Conversation not found");
+  }
+
+  const localResult = optimizePromptLocally(conversation);
+  const apiResult = canUseModelAssist(settings)
+    ? await optimizePromptWithApi(conversation, settings)
+    : null;
+  const finalResult = {
+    optimizedTitle: apiResult?.optimizedTitle || localResult.optimizedTitle,
+    optimizedPrompt: apiResult?.optimizedPrompt || localResult.optimizedPrompt,
+    scenario: apiResult?.scenario || localResult.scenario
+  };
+
+  const item = await updateConversation(conversationId, (current) => ({
+    ...current,
+    optimizedTitle: finalResult.optimizedTitle,
+    optimizedPrompt: finalResult.optimizedPrompt,
+    inferredScenario: finalResult.scenario || current.inferredScenario,
+    updatedAt: nowIso()
+  }));
+  await broadcastStorageUpdate();
+  return item;
 }
 
 async function promoteDraft(draftId) {
@@ -343,7 +379,8 @@ async function updateDraftItem(payload) {
     outputFormat: payload.outputFormat,
     successCriteria: payload.successCriteria,
     steps: payload.steps,
-    stepSources: baseDraft.stepSources || []
+    stepSources: baseDraft.stepSources || [],
+    workflowPrompts: baseDraft.workflowPrompts || []
   };
   const validated = await applyApiValidationIfNeeded({
     ...nextDraft,
@@ -390,7 +427,8 @@ async function updateSkillItem(payload) {
     outputFormat: payload.outputFormat,
     successCriteria: payload.successCriteria,
     steps: payload.steps,
-    stepSources: baseSkill.stepSources || []
+    stepSources: baseSkill.stepSources || [],
+    workflowPrompts: baseSkill.workflowPrompts || []
   };
   const validated = await applyApiValidationIfNeeded({
     ...nextSkill,
@@ -420,6 +458,7 @@ async function updateVariantItem(payload) {
     promptTemplate: payload.promptTemplate,
     steps: payload.steps,
     stepSources: variant.stepSources || [],
+    workflowPrompts: variant.workflowPrompts || [],
     updatedAt: nowIso()
   }));
   await broadcastStorageUpdate();
@@ -458,6 +497,25 @@ async function runSkillCheckForAsset(payload) {
   return runSkillCheck(asset, settings);
 }
 
+async function runWorkflowPromptCheckForAsset(payload) {
+  const settings = await getSettings();
+  const state = await getAllState();
+  const asset = state.skills.find((item) => item.id === payload.id)
+    || state.drafts.find((item) => item.id === payload.id)
+    || state.variants.find((item) => item.id === payload.id);
+
+  if (!asset) {
+    throw new Error("Asset not found for workflow prompt check");
+  }
+
+  const prompt = asset.workflowPrompts?.[payload.index];
+  if (!prompt) {
+    throw new Error("Workflow prompt not found");
+  }
+
+  return runWorkflowPromptCheck(asset, prompt, settings);
+}
+
 async function applyApiValidationIfNeeded(asset, settings) {
   if (settings.validationMode !== "api") {
     return asset;
@@ -479,14 +537,18 @@ async function ensureContentScriptForTab(tabId) {
 }
 
 async function compileFromExistingMemory(memory, payload, settings) {
+  const preparedPayload = canUseModelAssist(settings)
+    ? await preparePayloadForCompilation(payload, settings)
+    : payload;
+
   let draft = compileSkillDraft({
-    ...payload,
+    ...preparedPayload,
     conversationId: memory.id
   }, settings);
 
-  if (settings.validationMode === "api") {
+  if (canUseModelAssist(settings)) {
     draft = await extractSkillDraftWithApi({
-      ...payload,
+      ...preparedPayload,
       conversationId: memory.id
     }, draft, settings);
   }
@@ -497,17 +559,118 @@ async function compileFromExistingMemory(memory, payload, settings) {
   return draft;
 }
 
+async function updateWorkflowPromptItem(payload) {
+  const settings = await getSettings();
+  const updater = (asset) => rebuildAssetAfterWorkflowPromptEdit(asset, payload, settings);
+
+  if (payload.kind === "draft") {
+    const item = await updateDraft(payload.id, updater);
+    await broadcastStorageUpdate();
+    return item;
+  }
+
+  if (payload.kind === "skill") {
+    const item = await updateSkill(payload.id, updater);
+    await broadcastStorageUpdate();
+    return item;
+  }
+
+  if (payload.kind === "variant") {
+    const item = await updateVariant(payload.id, updater);
+    await broadcastStorageUpdate();
+    return item;
+  }
+
+  throw new Error("Unsupported asset kind for workflow prompt update");
+}
+
+async function optimizeWorkflowPromptItem(payload) {
+  const settings = await getSettings();
+  const state = await getAllState();
+  const asset = state.skills.find((item) => item.id === payload.id)
+    || state.drafts.find((item) => item.id === payload.id)
+    || state.variants.find((item) => item.id === payload.id);
+
+  if (!asset) {
+    throw new Error("Asset not found for workflow prompt optimization");
+  }
+
+  const prompt = asset.workflowPrompts?.[payload.index];
+  if (!prompt) {
+    throw new Error("Workflow prompt not found");
+  }
+
+  const localResult = optimizeWorkflowPromptLocally(prompt, asset.scenario || asset.scenarioOverride || "");
+  const apiResult = canUseModelAssist(settings)
+    ? await optimizeWorkflowPromptWithApi(asset, prompt, settings)
+    : null;
+
+  return updateWorkflowPromptItem({
+    id: payload.id,
+    kind: payload.kind,
+    index: payload.index,
+    title: apiResult?.optimizedTitle || localResult.optimizedTitle || prompt.title,
+    prompt: apiResult?.optimizedPrompt || localResult.optimizedPrompt || prompt.prompt
+  });
+}
+
+function rebuildAssetAfterWorkflowPromptEdit(asset, payload, settings) {
+  const workflowPrompts = (asset.workflowPrompts || []).map((item, index) => (
+    index === payload.index
+      ? {
+        ...item,
+        previousTitle: item.title,
+        previousPrompt: item.prompt,
+        title: payload.title,
+        prompt: payload.prompt,
+        updatedAt: nowIso()
+      }
+      : item
+  ));
+
+  const selectedText = workflowPrompts.map((item) => item.prompt).join("\n\n") || asset.example || "";
+  const rebuilt = buildSkillStructureFromWorkflowPrompts({
+    workflowPrompts,
+    scenario: asset.scenario || asset.scenarioOverride || "Reusable AI workflow",
+    selectedText,
+    payload: {
+      platform: asset.preferredForPlatforms?.[0] || "other"
+    }
+  });
+
+  const nextAsset = {
+    ...asset,
+    workflowPrompts,
+    inputs: rebuilt.inputs,
+    steps: rebuilt.steps,
+    stepSources: rebuilt.stepSources,
+    promptTemplate: rebuilt.promptTemplate,
+    outputFormat: rebuilt.outputFormat,
+    useWhen: asset.useWhen || rebuilt.useWhen,
+    notFor: asset.notFor || rebuilt.notFor,
+    goal: asset.goal || rebuilt.goal,
+    whatItDoes: asset.whatItDoes || rebuilt.whatItDoes,
+    updatedAt: nowIso()
+  };
+
+  if (asset.kind === "skill_draft" || asset.kind === "skill") {
+    nextAsset.validation = validateSkillAsset(nextAsset, settings);
+  }
+
+  return nextAsset;
+}
+
 function buildCombinedPayloadFromSources(sources) {
   const titles = sources
-    .map((item) => item.sourceTitle || item.selectedText || "")
+    .map((item) => item.optimizedTitle || item.sourceTitle || item.selectedText || "")
     .filter(Boolean)
     .slice(0, 3);
   const selectedText = sources
-    .map((item) => item.selectedText || "")
+    .map((item) => item.optimizedPrompt || item.selectedText || "")
     .filter(Boolean)
     .join("\n\n---\n\n");
   const turns = sources.flatMap((item) => (
-    (item.turns || []).map((turn) => ({
+    applyOptimizedTurns(item).map((turn) => ({
       ...turn,
       text: `[${item.sourceTitle || item.sourcePlatform || "source"}] ${turn.text}`
     }))
@@ -525,6 +688,69 @@ function buildCombinedPayloadFromSources(sources) {
     conversationId: sources[0]?.id,
     conversationIds: sources.map((item) => item.id)
   };
+}
+
+function applyOptimizedTurns(source) {
+  if (!source?.optimizedPrompt) {
+    return source?.turns || [];
+  }
+
+  const userTurnIndex = (source.turns || []).findIndex((turn) => turn.role === "user");
+  if (userTurnIndex < 0) {
+    return [
+      {
+        id: `turn_opt_${source.id}`,
+        role: "user",
+        text: source.optimizedPrompt
+      },
+      ...(source.turns || [])
+    ];
+  }
+
+  return (source.turns || []).map((turn, index) => (
+    index === userTurnIndex
+      ? { ...turn, text: source.optimizedPrompt }
+      : turn
+  ));
+}
+
+async function preparePayloadForCompilation(payload, settings) {
+  const workflowPrompts = await optimizeWorkflowTurnsWithApi(payload, settings);
+  if (!workflowPrompts.length) {
+    return payload;
+  }
+
+  const promptMap = new Map();
+  workflowPrompts.forEach((item) => {
+    (item.sourceTurnIds || []).forEach((turnId) => {
+      if (!promptMap.has(turnId) && item.prompt) {
+        promptMap.set(turnId, item.prompt);
+      }
+    });
+  });
+
+  const optimizedTurns = (payload.turns || []).map((turn) => (
+    turn?.role === "user" && promptMap.has(turn.id)
+      ? { ...turn, text: promptMap.get(turn.id) }
+      : turn
+  ));
+
+  const selectedText = workflowPrompts.map((item) => item.prompt).join("\n\n");
+
+  return {
+    ...payload,
+    selectedText: selectedText || payload.selectedText,
+    turns: optimizedTurns,
+    workflowPromptsOverride: workflowPrompts
+  };
+}
+
+function canUseModelAssist(settings) {
+  return Boolean(
+    settings?.apiBaseUrl?.trim()
+      && settings?.apiModel?.trim()
+      && settings?.apiKey?.trim()
+  );
 }
 
 async function broadcastStorageUpdate() {

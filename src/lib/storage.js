@@ -12,10 +12,10 @@ async function setBucket(key, value) {
 export async function getSettings() {
   const result = await chrome.storage.local.get([STORAGE_KEYS.SETTINGS]);
   return {
-    validationMode: "local",
-    apiProvider: "custom",
-    apiBaseUrl: "",
-    apiModel: "",
+    validationMode: "api",
+    apiProvider: "zhipu",
+    apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    apiModel: "glm-4.5-air",
     apiKey: "",
     autoCompileAfterCapture: true,
     openWorkspaceAfterCapture: true,
@@ -45,10 +45,10 @@ export async function getAllState() {
     skills: result[STORAGE_KEYS.SKILLS] || [],
     variants: result[STORAGE_KEYS.VARIANTS] || [],
     settings: {
-      validationMode: "local",
-      apiProvider: "custom",
-      apiBaseUrl: "",
-      apiModel: "",
+      validationMode: "api",
+      apiProvider: "zhipu",
+      apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
+      apiModel: "glm-4.5-air",
       apiKey: result[STORAGE_KEYS.SETTINGS]?.apiKey ? "********" : "",
       ...(result[STORAGE_KEYS.SETTINGS] || {})
     }

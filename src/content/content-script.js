@@ -446,12 +446,16 @@
         return;
       }
 
-      insertSkill(skill);
-      await chrome.runtime.sendMessage({
-        type: MESSAGE_TYPES.INSERT_SKILL,
-        payload: { skillId }
-      });
-      showToast(`Inserted "${skill.name}"`);
+      const ok = insertSkill(skill);
+      if (ok) {
+        await chrome.runtime.sendMessage({
+          type: MESSAGE_TYPES.INSERT_SKILL,
+          payload: { skillId }
+        });
+        showToast(`Inserted "${skill.name}"`);
+      } else {
+        showToast(`Could not fully apply "${skill.name}" on this page`);
+      }
       const searchInput = palette.querySelector("input");
       if (searchInput instanceof HTMLInputElement) {
         searchInput.focus();
@@ -813,6 +817,9 @@
     });
 
     const resolvedTemplate = applyInputValues(skill.promptTemplate || "", values);
+    const workflowPrompts = (skill.workflowPrompts || []).map((item, index) => (
+      `Step Prompt ${index + 1}: ${item.title}\n${applyInputValues(item.prompt || "", values)}`
+    ));
     const steps = (skill.steps || []).map((step, index) => `${index + 1}. ${applyInputValues(step, values)}`);
     const successCriteria = (skill.successCriteria || []).map((item) => `- ${applyInputValues(item, values)}`);
     const providedInputs = Object.entries(values)
@@ -829,8 +836,10 @@
       skill.outputFormat ? `Output format: ${applyInputValues(skill.outputFormat, values)}` : "",
       successCriteria.length ? "Success criteria:" : "",
       ...successCriteria,
-      resolvedTemplate ? "Reference prompt:" : "",
-      resolvedTemplate || ""
+      workflowPrompts.length ? "Optimized prompts:" : "",
+      ...workflowPrompts,
+      !workflowPrompts.length && resolvedTemplate ? "Reference prompt:" : "",
+      !workflowPrompts.length ? resolvedTemplate || "" : ""
     ].filter(Boolean);
 
     return lines.join("\n");

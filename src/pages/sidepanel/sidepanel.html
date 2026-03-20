@@ -90,8 +90,14 @@
             <div data-prompt-meta class="stack"></div>
           </section>
 
+          <section class="detail-extraction-block" data-optimized-prompt-panel hidden>
+            <h3>Optimized Prompt / 一键优化后的 Prompt</h3>
+            <div data-optimized-prompt-content class="stack"></div>
+          </section>
+
           <div class="action-row">
             <button type="submit">Save Prompt / 保存 Prompt</button>
+            <button type="button" data-action="optimize-conversation">Optimize Prompt / 一键优化</button>
             <button type="button" data-action="clear-detail">Close / 关闭</button>
           </div>
         </form>
@@ -130,9 +136,9 @@
           </label>
 
           <details class="raw-json-wrap">
-            <summary>Run Prompt / 运行文本（自动生成）</summary>
+            <summary>Runbook / 运行手册（自动生成）</summary>
             <label class="field-label">
-              <span>Run Prompt / 运行文本</span>
+              <span>Runbook / 运行手册</span>
               <textarea name="promptTemplate" rows="8"></textarea>
             </label>
           </details>
@@ -172,6 +178,33 @@
         <section class="detail-source-block" data-step-map-panel hidden>
           <h3>Step Mapping / 步骤来源映射</h3>
           <div data-step-map-content class="stack"></div>
+        </section>
+
+        <section class="detail-source-block" data-workflow-prompts-panel hidden>
+          <h3>Workflow Prompts / 工作流 Prompt</h3>
+          <div data-workflow-prompts-content class="stack"></div>
+        </section>
+
+        <section class="detail-source-block" data-workflow-editor-panel hidden>
+          <h3>Workflow Prompt Editor / 工作流 Prompt 编辑</h3>
+          <form data-workflow-prompt-form>
+            <input type="hidden" name="index" />
+            <label class="field-label">
+              <span>Prompt Title / Prompt 标题</span>
+              <input name="title" type="text" />
+            </label>
+            <label class="field-label">
+              <span>Prompt Content / Prompt 内容</span>
+              <textarea name="prompt" rows="8"></textarea>
+            </label>
+            <div class="action-row">
+              <button type="submit">Save Workflow Prompt / 保存工作流 Prompt</button>
+              <button type="button" data-action="optimize-workflow-prompt">Optimize Prompt / 一键优化</button>
+              <button type="button" data-action="run-workflow-prompt-check">Run Prompt Check / 检查这条 Prompt</button>
+              <button type="button" data-action="clear-workflow-editor">Close / 关闭</button>
+            </div>
+          </form>
+          <div data-workflow-prompt-check class="stack"></div>
         </section>
 
         <section class="detail-source-block" data-compare-panel hidden>
