@@ -44,7 +44,7 @@
           <h2>Raw Captures / 原始素材</h2>
           <p class="muted">这里是你保存下来的原始内容。系统会自动整理一版建议；你可以直接编辑，或者直接升级为正式技能。</p>
           <div class="action-row">
-            <button type="button" data-action="compile-selected">用选中的 Prompt 生成技能</button>
+            <button type="button" data-action="compile-selected">把选中的 Prompt 合并成一个技能</button>
             <span class="muted" data-selected-count>已选择: 0</span>
           </div>
           <div data-queue-raw class="stack"></div>
@@ -160,17 +160,17 @@
           </div>
         </form>
 
-        <details class="detail-extraction-block detail-fold detail-fold-extraction" data-extraction-panel hidden open>
+        <details class="detail-extraction-block detail-fold detail-fold-extraction" data-extraction-panel hidden>
           <summary>抽取来源</summary>
           <div data-extraction-content class="stack"></div>
         </details>
 
-        <details class="detail-validation-block detail-fold detail-fold-validation" data-validation-panel hidden open>
+        <details class="detail-validation-block detail-fold detail-fold-validation" data-validation-panel hidden>
           <summary>自动检查</summary>
           <div data-validation-content class="stack"></div>
         </details>
 
-        <details class="detail-extraction-block detail-fold detail-fold-runcheck" data-run-check-panel hidden open>
+        <details class="detail-extraction-block detail-fold detail-fold-runcheck" data-run-check-panel hidden>
           <summary>试运行结果</summary>
           <div data-run-check-content class="stack"></div>
         </details>

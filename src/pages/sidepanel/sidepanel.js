@@ -912,7 +912,7 @@ document.addEventListener("click", async (event) => {
     await load();
     if (draft) {
       showDetailPanel(draft, "draft");
-      setFeedback("已根据选中的 Prompt 生成技能草稿。");
+      setFeedback("已把选中的 Prompt 合并成一条技能草稿。");
     }
     return;
   }

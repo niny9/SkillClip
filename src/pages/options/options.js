@@ -716,17 +716,19 @@ document.addEventListener("click", async (event) => {
   }
 
   if (action === "copy-json") {
+    setFeedback("正在复制当前 JSON...");
     const text = document.querySelector("[data-json-output]").value;
     await navigator.clipboard.writeText(text);
-    setFeedback("JSON copied.");
+    setFeedback("当前 JSON 已复制。");
   }
 
   if (action === "download-json") {
+    setFeedback("正在准备下载当前 JSON...");
     const fileName = selectedAssetSnapshot
       ? `skillclip-${selectedAssetSnapshot.kind}-${selectedAssetSnapshot.id}.json`
       : "skillclip-state.json";
     downloadJson(document.querySelector("[data-json-output]").value, fileName);
-    setFeedback("JSON download started.");
+    setFeedback("当前 JSON 已开始下载。");
   }
 
   if (action === "reset-state") {

@@ -847,7 +847,18 @@
       return false;
     }
 
+    const result = await buildRuntimeSkillText(skill);
+    if (!result?.text) {
+      return false;
+    }
+
     const adapter = getCurrentAdapter();
+    if (result.applyMode === "send") {
+      showToast("正在准备新对话并应用技能...");
+      await tryOpenFreshChat(adapter.id);
+      await wait(380);
+    }
+
     const activeInput = lastFocusedInput instanceof HTMLElement && lastFocusedInput.isConnected && isVisible(lastFocusedInput)
       ? lastFocusedInput
       : document.activeElement instanceof HTMLElement && matchesInputTarget(document.activeElement)
@@ -856,11 +867,6 @@
 
     if (!activeInput) {
       showToast("当前页面没有找到可写入的 AI 输入框");
-      return false;
-    }
-
-    const result = await buildRuntimeSkillText(skill);
-    if (!result?.text) {
       return false;
     }
 
@@ -1090,6 +1096,55 @@
     }
 
     return false;
+  }
+
+  async function tryOpenFreshChat(platformId) {
+    const selectorsByPlatform = {
+      [PLATFORMS.GEMINI]: [
+        "a[aria-label*='New chat']",
+        "button[aria-label*='New chat']",
+        "button[aria-label*='新对话']",
+        "a[href='/app']"
+      ],
+      [PLATFORMS.DEEPSEEK]: [
+        "button[aria-label*='新对话']",
+        "button[aria-label*='New chat']",
+        "a[href*='new']"
+      ],
+      [PLATFORMS.KIMI]: [
+        "button[aria-label*='新建对话']",
+        "button[aria-label*='新对话']",
+        "button[aria-label*='New chat']"
+      ],
+      [PLATFORMS.DOUBAO]: [
+        "button[aria-label*='新对话']",
+        "button[aria-label*='新建']"
+      ],
+      [PLATFORMS.QWEN]: [
+        "button[aria-label*='新对话']",
+        "button[aria-label*='New chat']"
+      ],
+      [PLATFORMS.COPILOT]: [
+        "button[aria-label*='New topic']",
+        "button[aria-label*='新对话']",
+        "button[aria-label*='New chat']"
+      ]
+    };
+
+    const candidates = selectorsByPlatform[platformId] || [];
+    for (const selector of candidates) {
+      const button = Array.from(document.querySelectorAll(selector))
+        .find((node) => node instanceof HTMLElement && isVisible(node) && !isInsideSkillclipUi(node));
+      if (button instanceof HTMLElement) {
+        button.click();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function wait(ms) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
   }
 
   function toggleVoiceCapture(button) {
