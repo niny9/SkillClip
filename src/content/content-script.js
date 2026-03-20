@@ -199,6 +199,7 @@
   let actionBar;
   let palette;
   let toast;
+  let variableSheet;
   let voiceStatus;
   let activeRecognition = null;
   let cachedSkills = [];
@@ -221,19 +222,70 @@
         openSkillPalette();
       }
       if (message.type === MESSAGE_TYPES.APPLY_SKILL) {
-        const ok = insertSkill(message.payload?.skill);
-        sendResponse?.({ ok });
-        return;
+        insertSkill(message.payload?.skill).then((ok) => {
+          sendResponse?.({ ok });
+        });
+        return true;
       }
       if (message.type === MESSAGE_TYPES.STORAGE_UPDATED) {
         loadState();
       }
       sendResponse?.({ ok: true });
     });
-
+ 
     document.addEventListener("keydown", onKeydown, true);
     document.addEventListener("focusin", onFocusIn, true);
     loadState();
+  }
+
+  function ensureVariableSheet() {
+    if (variableSheet) {
+      return;
+    }
+
+    variableSheet = document.createElement("div");
+    variableSheet.className = "skillclip-panel skillclip-variable-sheet";
+    variableSheet.innerHTML = `
+      <div class="skillclip-panel-header">
+        <strong>技能输入</strong>
+        <button type="button" data-close>关闭</button>
+      </div>
+      <form class="skillclip-panel-body" data-skill-input-form>
+        <div data-skill-input-fields class="skillclip-variable-fields"></div>
+        <label class="skillclip-field">
+          <span>应用模式</span>
+          <select name="applyMode">
+            <option value="draft">只插入草稿</option>
+            <option value="send">插入后尝试发送</option>
+          </select>
+        </label>
+        <label class="skillclip-field">
+          <span>
+            <input name="previewBeforeSend" type="checkbox" checked />
+            发送前先预览一次
+          </span>
+        </label>
+        <div data-skill-status class="skillclip-panel-tip">请先填写变量，然后选择应用方式。</div>
+        <div data-skill-preview class="skillclip-preview" hidden></div>
+        <div class="skillclip-inline-actions">
+          <button type="submit">应用技能</button>
+          <button type="button" data-close>取消</button>
+        </div>
+      </form>
+    `;
+
+    variableSheet.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      if (target.dataset.close !== undefined) {
+        closeVariableSheet();
+      }
+    });
+
+    makePanelDraggable(variableSheet);
+    document.body.appendChild(variableSheet);
   }
 
   function onFocusIn(event) {
@@ -263,6 +315,7 @@
     if (event.key === "Escape") {
       closeActionBar();
       closeSkillPalette();
+      closeVariableSheet();
       stopVoiceCapture();
     }
   }
@@ -281,6 +334,7 @@
 
   function openSkillPalette() {
     closeActionBar();
+    lastFocusedInput = getActiveInput() || lastFocusedInput;
     ensureSkillPalette();
     renderSkillList("");
     ensurePanelVisible(palette);
@@ -307,14 +361,14 @@
           <strong>SkillClip</strong>
           <p class="skillclip-panel-meta" data-platform-meta></p>
         </div>
-        <button type="button" data-close>Close</button>
+        <button type="button" data-close>关闭</button>
       </div>
       <div class="skillclip-panel-body">
-        <button type="button" data-action="save-prompt">Save Prompt</button>
-        <button type="button" data-action="compile-skill">Compile to Skill</button>
-        <button type="button" data-action="save-flow">Save Whole Flow</button>
-        <button type="button" data-action="toggle-voice">Voice to Input</button>
-        <p class="skillclip-voice-status" data-voice-status>Voice is ready</p>
+        <button type="button" data-action="save-prompt">保存 Prompt</button>
+        <button type="button" data-action="compile-skill">编译为技能</button>
+        <button type="button" data-action="save-flow">保存整个工作流</button>
+        <button type="button" data-action="toggle-voice">语音输入</button>
+        <p class="skillclip-voice-status" data-voice-status>语音功能已就绪</p>
         <div class="skillclip-voice-actions" data-voice-actions hidden></div>
       </div>
     `;
@@ -364,24 +418,27 @@
       const settings = settingsResponse?.result || {};
 
       if (action === "save-prompt") {
+        showToast("正在保存 Prompt...");
         const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.SAVE_PROMPT, payload });
-        showToast(response?.result?.preview ? "Saved and compiled into preview" : "Saved to Inbox");
+        showToast(response?.result?.preview ? "已保存，并自动整理成技能建议" : "已保存到原始素材");
       }
 
       if (action === "save-flow") {
+        showToast("正在保存整个工作流...");
         const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.SAVE_FLOW, payload });
         if (!payload.turns.length && !payload.selectedText) {
-          showToast("No flow found on this page yet");
+          showToast("当前页面还没有可用的工作流内容");
         } else if (payload.fallbackFlow) {
-          showToast("Whole flow saved to queue as fallback content");
+          showToast("已按兜底方式保存整个工作流");
         } else {
-          showToast(response?.result?.preview ? "Whole flow saved and added to pending skills" : "Whole flow saved to queue");
+          showToast(response?.result?.preview ? "整个工作流已保存，并开始生成技能" : "整个工作流已保存到原始素材");
         }
       }
 
       if (action === "compile-skill") {
+        showToast("正在编译为技能...");
         await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.COMPILE_SKILL, payload });
-        showToast("Compiled into preview");
+        showToast("已生成技能草稿");
       }
 
       if (settings.openWorkspaceAfterCapture !== false) {
@@ -416,11 +473,11 @@
     palette.className = "skillclip-panel skillclip-palette";
     palette.innerHTML = `
       <div class="skillclip-panel-header">
-        <strong>Skill Palette</strong>
-        <button type="button" data-close>Close</button>
+        <strong>技能面板</strong>
+        <button type="button" data-close>关闭</button>
       </div>
       <div class="skillclip-panel-body">
-        <input type="text" placeholder="Search skills" />
+        <input type="text" placeholder="搜索技能" />
         <div data-results class="skillclip-list"></div>
       </div>
     `;
@@ -436,25 +493,26 @@
         return;
       }
 
-      const skillId = target.dataset.skillId;
-      if (!skillId) {
+      const skillButton = target.closest("[data-skill-id]");
+      if (!(skillButton instanceof HTMLElement)) {
         return;
       }
+      const skillId = skillButton.dataset.skillId;
 
       const skill = cachedSkills.find((item) => item.id === skillId);
       if (!skill) {
         return;
       }
 
-      const ok = insertSkill(skill);
+      const ok = await insertSkill(skill);
       if (ok) {
         await chrome.runtime.sendMessage({
           type: MESSAGE_TYPES.INSERT_SKILL,
           payload: { skillId }
         });
-        showToast(`Inserted "${skill.name}"`);
+        showToast(`已插入技能：${skill.name}`);
       } else {
-        showToast(`Could not fully apply "${skill.name}" on this page`);
+        showToast(`当前页面暂时无法完整应用技能：${skill.name}`);
       }
       const searchInput = palette.querySelector("input");
       if (searchInput instanceof HTMLInputElement) {
@@ -558,17 +616,19 @@
         .includes(normalized);
     });
 
-    if (skills.length === 0) {
-      results.innerHTML = `<div class="skillclip-empty">No skills found yet</div>`;
+    const sortedSkills = [...skills].sort((left, right) => rankSkillForPalette(right) - rankSkillForPalette(left));
+
+    if (sortedSkills.length === 0) {
+      results.innerHTML = `<div class="skillclip-empty">没有匹配到技能</div>`;
       return;
     }
 
-    results.innerHTML = skills
+    results.innerHTML = sortedSkills
       .slice(0, 8)
       .map((skill) => `
         <button type="button" class="skillclip-skill-item" data-skill-id="${skill.id}">
           <span>${escapeHtml(skill.name)}</span>
-          <small>${escapeHtml(skill.scenario || "Reusable workflow")}</small>
+          <small>${escapeHtml(skill.scenario || "可复用工作流")}</small>
         </button>
       `)
       .join("");
@@ -600,18 +660,18 @@
   async function saveVoiceResult(action) {
     const payload = buildCapturePayload(action, lastVoiceTranscript);
     if (!payload.selectedText) {
-      showToast("No voice text available yet");
+      showToast("当前还没有可保存的语音内容");
       return;
     }
 
     if (action === "save-prompt") {
       await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.SAVE_PROMPT, payload });
-      showToast("Voice text saved to Inbox");
+      showToast("语音内容已保存为 Prompt");
     }
 
     if (action === "compile-skill") {
       await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.COMPILE_SKILL, payload });
-      showToast("Voice text compiled into a skill draft");
+      showToast("语音内容已编译为技能草稿");
     }
 
     clearVoiceActions();
@@ -781,9 +841,9 @@
     return target.matches("textarea, input, [contenteditable='true'], div[role='textbox']") && !isInsideSkillclipUi(target);
   }
 
-  function insertSkill(skill) {
+  async function insertSkill(skill) {
     if (!skill) {
-      showToast("No skill payload received");
+      showToast("没有收到可应用的技能内容");
       return false;
     }
 
@@ -794,55 +854,198 @@
       ? document.activeElement
       : getActiveInput();
 
-    const text = buildRuntimeSkillText(skill);
     if (!activeInput) {
-      showToast("No AI input found on this page");
+      showToast("当前页面没有找到可写入的 AI 输入框");
       return false;
     }
 
-    insertTextIntoInput(activeInput, text, false, adapter.id);
+    const result = await buildRuntimeSkillText(skill);
+    if (!result?.text) {
+      return false;
+    }
+
+    insertTextIntoInput(activeInput, result.text, false, adapter.id);
     lastFocusedInput = activeInput;
     const insertedValue = readInputValue(activeInput);
-    const success = normalizeForCompare(insertedValue).includes(normalizeForCompare(text).slice(0, 40));
+    const success = normalizeForCompare(insertedValue).includes(normalizeForCompare(result.text).slice(0, 40));
     if (!success) {
-      showToast("Skill inserted, but this site may need manual review");
+      showToast("技能内容已插入，但这个页面可能还需要你手动确认");
+      return false;
+    }
+
+    if (result.applyMode === "send") {
+      const sent = trySubmitCurrentInput();
+      showToast(sent ? "技能已插入并尝试发送" : "技能已插入，但当前页面未找到发送按钮");
+    } else {
+      showToast("技能内容已插入到当前输入框");
     }
     return success;
   }
 
-  function buildRuntimeSkillText(skill) {
-    const values = {};
-    (skill.inputs || []).forEach((input) => {
-      values[input.key] = window.prompt(`Value for ${input.label || input.key}`) || "";
-    });
+  async function buildRuntimeSkillText(skill) {
+    const values = await resolveSkillInputs(skill);
+    if (values == null) {
+      showToast("已取消技能应用");
+      return null;
+    }
 
     const resolvedTemplate = applyInputValues(skill.promptTemplate || "", values);
-    const workflowPrompts = (skill.workflowPrompts || []).map((item, index) => (
-      `Step Prompt ${index + 1}: ${item.title}\n${applyInputValues(item.prompt || "", values)}`
-    ));
+    if (resolvedTemplate) {
+      return {
+        text: resolvedTemplate,
+        applyMode: values.__applyMode || "draft"
+      };
+    }
+
     const steps = (skill.steps || []).map((step, index) => `${index + 1}. ${applyInputValues(step, values)}`);
-    const successCriteria = (skill.successCriteria || []).map((item) => `- ${applyInputValues(item, values)}`);
     const providedInputs = Object.entries(values)
       .filter(([, value]) => value && value.trim())
-      .map(([key, value]) => `- ${key}: ${value.trim()}`);
+      .map(([key, value]) => `- ${key}：${value.trim()}`);
 
-    const lines = [
-      skill.goal ? `Goal: ${applyInputValues(skill.goal, values)}` : "",
-      skill.useWhen ? `Use when: ${applyInputValues(skill.useWhen, values)}` : "",
-      providedInputs.length ? "Inputs:" : "",
+    return {
+      text: [
+      skill.goal ? `目标：${applyInputValues(skill.goal, values)}` : "",
+      providedInputs.length ? "输入参数：" : "",
       ...providedInputs,
-      steps.length ? "Steps:" : "",
+      steps.length ? "执行步骤：" : "",
       ...steps,
-      skill.outputFormat ? `Output format: ${applyInputValues(skill.outputFormat, values)}` : "",
-      successCriteria.length ? "Success criteria:" : "",
-      ...successCriteria,
-      workflowPrompts.length ? "Optimized prompts:" : "",
-      ...workflowPrompts,
-      !workflowPrompts.length && resolvedTemplate ? "Reference prompt:" : "",
-      !workflowPrompts.length ? resolvedTemplate || "" : ""
-    ].filter(Boolean);
+      skill.outputFormat ? `输出格式：${applyInputValues(skill.outputFormat, values)}` : ""
+      ].filter(Boolean).join("\n"),
+      applyMode: values.__applyMode || "draft"
+    };
+  }
 
-    return lines.join("\n");
+  async function resolveSkillInputs(skill) {
+    const inputs = skill.inputs || [];
+    if (!inputs.length) {
+      return {};
+    }
+
+    ensureVariableSheet();
+    const fields = variableSheet.querySelector("[data-skill-input-fields]");
+    const form = variableSheet.querySelector("[data-skill-input-form]");
+    const preview = variableSheet.querySelector("[data-skill-preview]");
+    const status = variableSheet.querySelector("[data-skill-status]");
+    if (!fields || !form) {
+      return {};
+    }
+    const memoryResponse = await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.GET_SKILL_INPUT_MEMORY,
+      payload: { skillId: skill.id, platform: getCurrentAdapter().id }
+    });
+    const rememberedValues = memoryResponse?.result || {};
+
+    fields.innerHTML = inputs.map((input) => `
+      <label class="skillclip-field">
+        <span>${escapeHtml(input.label || input.key)}${input.required ? " *" : ""}</span>
+        <input
+          name="${escapeHtml(input.key)}"
+          type="text"
+          value="${escapeHtml(rememberedValues[input.key] || "")}"
+          placeholder="${escapeHtml(input.description || "")}"
+        />
+      </label>
+    `).join("");
+    if (preview instanceof HTMLElement) {
+      preview.hidden = true;
+      preview.textContent = "";
+      delete preview.dataset.confirmed;
+    }
+    if (status instanceof HTMLElement) {
+      status.textContent = "请先填写变量，然后选择应用方式。";
+    }
+
+    ensurePanelVisible(variableSheet);
+    variableSheet.classList.add("skillclip-visible");
+
+    return new Promise((resolve) => {
+      const finish = (value) => {
+        form.removeEventListener("submit", onSubmit);
+        variableSheet.removeEventListener("click", onCancelCapture, true);
+        closeVariableSheet();
+        resolve(value);
+      };
+
+      const onSubmit = (event) => {
+        event.preventDefault();
+        const formData = new FormData(form);
+        const values = {};
+        const missingRequired = [];
+        inputs.forEach((input) => {
+          values[input.key] = String(formData.get(input.key) || "");
+          if (input.required && !values[input.key].trim()) {
+            missingRequired.push(input.label || input.key);
+          }
+        });
+        if (missingRequired.length) {
+          if (status instanceof HTMLElement) {
+            status.textContent = `请先填写必填项：${missingRequired.join("、")}`;
+          }
+          showToast(`请先填写必填项：${missingRequired.join("、")}`);
+          return;
+        }
+        values.__applyMode = String(formData.get("applyMode") || "draft");
+        values.__previewBeforeSend = formData.get("previewBeforeSend") === "on" ? "true" : "false";
+        const previewText = applyInputValues(skill.promptTemplate || "", values);
+        if (values.__applyMode === "send" && values.__previewBeforeSend === "true" && preview instanceof HTMLElement && !preview.dataset.confirmed) {
+          preview.hidden = false;
+          preview.textContent = previewText || "当前技能没有可预览内容。";
+          preview.dataset.confirmed = "true";
+          if (status instanceof HTMLElement) {
+            status.textContent = "已生成发送前预览。请确认内容后，再点一次“应用技能”。";
+          }
+          showToast("请先检查预览内容，再点一次应用技能");
+          return;
+        }
+        if (status instanceof HTMLElement) {
+          status.textContent = values.__applyMode === "send"
+            ? "正在应用技能，并准备尝试发送..."
+            : "正在把技能内容插入输入框...";
+        }
+        chrome.runtime.sendMessage({
+          type: MESSAGE_TYPES.SAVE_SKILL_INPUT_MEMORY,
+          payload: { skillId: skill.id, platform: getCurrentAdapter().id, values }
+        }).catch(() => {});
+        finish(values);
+      };
+
+      const onCancelCapture = (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+        if (target.dataset.close !== undefined) {
+          finish(null);
+        }
+      };
+
+      form.addEventListener("submit", onSubmit, { once: true });
+      variableSheet.addEventListener("click", onCancelCapture, true);
+    });
+  }
+
+  function closeVariableSheet() {
+    if (variableSheet) {
+      variableSheet.classList.remove("skillclip-visible");
+      const preview = variableSheet.querySelector("[data-skill-preview]");
+      const status = variableSheet.querySelector("[data-skill-status]");
+      if (preview instanceof HTMLElement) {
+        preview.hidden = true;
+        preview.textContent = "";
+        delete preview.dataset.confirmed;
+      }
+      if (status instanceof HTMLElement) {
+        status.textContent = "请先填写变量，然后选择应用方式。";
+      }
+    }
+  }
+
+  function rankSkillForPalette(skill) {
+    const qualityScore = (skill.workflowPrompts || []).reduce((sum, item) => sum + (item.quality?.score || 0), 0);
+    const averageQuality = skill.workflowPrompts?.length ? qualityScore / skill.workflowPrompts.length : 0;
+    const usage = skill.usageCount || 0;
+    const platformBonus = (skill.preferredForPlatforms || []).includes(getCurrentAdapter().id) ? 25 : 0;
+    return averageQuality + usage * 4 + platformBonus;
   }
 
   function applyInputValues(template, values) {
@@ -851,18 +1054,56 @@
     ), template || "");
   }
 
+  function trySubmitCurrentInput() {
+    const adapter = getCurrentAdapter();
+    const platformSpecific = {
+      [PLATFORMS.GEMINI]: [
+        "button[aria-label*='Send message']",
+        "button[aria-label*='发送']"
+      ],
+      [PLATFORMS.DEEPSEEK]: [
+        "button[data-testid*='send']",
+        "button[aria-label*='Send']"
+      ],
+      [PLATFORMS.KIMI]: [
+        "button[aria-label*='发送']",
+        "button[aria-label*='Send']"
+      ]
+    };
+    const candidates = [
+      ...(platformSpecific[adapter.id] || []),
+      "button[aria-label*='发送']",
+      "button[aria-label*='Send']",
+      "button[data-testid*='send']",
+      "button[type='submit']",
+      "[role='button'][aria-label*='发送']",
+      "[role='button'][aria-label*='Send']"
+    ];
+
+    for (const selector of candidates) {
+      const button = Array.from(document.querySelectorAll(selector))
+        .find((node) => node instanceof HTMLElement && isVisible(node) && !isInsideSkillclipUi(node));
+      if (button instanceof HTMLElement) {
+        button.click();
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   function toggleVoiceCapture(button) {
     if (activeRecognition) {
       stopVoiceCapture();
-      button.textContent = "Voice to Input";
-      updateVoiceStatus("Voice stopped");
+      button.textContent = "语音输入";
+      updateVoiceStatus("语音已停止");
       return;
     }
 
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!Recognition) {
-      updateVoiceStatus("Voice input is not supported in this browser");
-      showToast("Speech recognition is unavailable here");
+      updateVoiceStatus("当前浏览器不支持语音输入");
+      showToast("当前环境不支持语音识别");
       return;
     }
 
@@ -871,8 +1112,8 @@
       : getActiveInput();
 
     if (!activeInput) {
-      updateVoiceStatus("Focus an AI input before starting voice");
-      showToast("No writable AI input found");
+      updateVoiceStatus("开始语音前，请先点一下 AI 输入框");
+      showToast("没有找到可写入的 AI 输入框");
       return;
     }
 
@@ -889,8 +1130,8 @@
 
     recognition.onstart = () => {
       activeRecognition = recognition;
-      button.textContent = "Stop Voice";
-      updateVoiceStatus("Listening...");
+      button.textContent = "停止语音";
+      updateVoiceStatus("正在听你说话...");
       clearVoiceActions();
     };
 
@@ -912,23 +1153,23 @@
         lastInterim = finalTranscript.trim();
       }
 
-      updateVoiceStatus(interimTranscript ? `Listening: ${interimTranscript}` : "Listening...");
+      updateVoiceStatus(interimTranscript ? `正在识别：${interimTranscript}` : "正在听你说话...");
     };
 
     recognition.onerror = (event) => {
-      updateVoiceStatus(`Voice error: ${event.error}`);
+      updateVoiceStatus(`语音识别出错：${event.error}`);
       activeRecognition = null;
-      button.textContent = "Voice to Input";
+      button.textContent = "语音输入";
     };
 
     recognition.onend = () => {
       activeRecognition = null;
-      button.textContent = "Voice to Input";
+      button.textContent = "语音输入";
       if (lastVoiceTranscript.trim()) {
-        updateVoiceStatus("Voice captured. Choose what to do next.");
+        updateVoiceStatus("语音内容已识别完成，请选择下一步。");
         showVoiceActions();
-      } else if (voiceStatus?.textContent === "Listening...") {
-        updateVoiceStatus("Voice finished");
+      } else if (voiceStatus?.textContent === "正在听你说话...") {
+        updateVoiceStatus("语音识别结束");
       }
     };
 
@@ -942,7 +1183,7 @@
     }
     const button = actionBar?.querySelector("[data-action='toggle-voice']");
     if (button) {
-      button.textContent = "Voice to Input";
+      button.textContent = "语音输入";
     }
   }
 
@@ -960,11 +1201,11 @@
 
     container.hidden = false;
     container.innerHTML = `
-      <p class="skillclip-voice-hint">Voice result ready. Save it directly:</p>
+      <p class="skillclip-voice-hint">语音内容已就绪，你可以直接这样处理：</p>
       <div class="skillclip-inline-actions">
-        <button type="button" data-action="save-voice-prompt">Save as Prompt</button>
-        <button type="button" data-action="compile-voice-skill">Compile to Skill</button>
-        <button type="button" data-action="dismiss-voice-result">Keep Only In Input</button>
+        <button type="button" data-action="save-voice-prompt">保存为 Prompt</button>
+        <button type="button" data-action="compile-voice-skill">编译为技能</button>
+        <button type="button" data-action="dismiss-voice-result">只保留在输入框</button>
       </div>
     `;
   }

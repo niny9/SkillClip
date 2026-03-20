@@ -152,6 +152,38 @@
   background: rgba(255, 255, 255, 0.75);
 }
 
+.skillclip-variable-sheet {
+  width: min(420px, calc(100vw - 40px));
+}
+
+.skillclip-variable-fields {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.skillclip-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.skillclip-field span {
+  color: var(--skillclip-muted);
+  font-size: 0.85rem;
+}
+
+.skillclip-preview {
+  max-height: 220px;
+  overflow: auto;
+  padding: 0.85rem;
+  border: 1px solid var(--skillclip-line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--skillclip-muted);
+  white-space: pre-wrap;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
 .skillclip-voice-hint {
   margin: 0;
   color: var(--skillclip-muted);

@@ -202,6 +202,58 @@ p {
   color: var(--muted);
 }
 
+.detail-fold {
+  margin-top: 0.9rem;
+  border: 1px solid rgba(214, 203, 184, 0.9);
+  border-radius: 18px;
+  padding: 0.2rem 0.9rem 0.9rem;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.detail-fold summary {
+  cursor: pointer;
+  list-style: none;
+  font-weight: 700;
+  padding: 0.75rem 0 0.65rem;
+}
+
+.detail-fold summary::-webkit-details-marker {
+  display: none;
+}
+
+.detail-fold-extraction {
+  border-left: 5px solid #ce8f2f;
+}
+
+.detail-fold-validation {
+  border-left: 5px solid #1f6f5f;
+}
+
+.detail-fold-runcheck {
+  border-left: 5px solid #446c9c;
+}
+
+.detail-fold-stepmap {
+  border-left: 5px solid #8a5a44;
+}
+
+.detail-fold-workflow {
+  border-left: 5px solid #7a648a;
+}
+
+.detail-fold-source {
+  border-left: 5px solid #5f6f45;
+}
+
+.status-running {
+  border-color: #446c9c;
+  background: rgba(224, 233, 245, 0.78);
+}
+
+.status-running strong {
+  color: #244a77;
+}
+
 .action-row {
   display: flex;
   flex-wrap: wrap;

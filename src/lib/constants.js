@@ -3,7 +3,8 @@ export const STORAGE_KEYS = {
   DRAFTS: "skillclip.drafts",
   SKILLS: "skillclip.skills",
   VARIANTS: "skillclip.variants",
-  SETTINGS: "skillclip.settings"
+  SETTINGS: "skillclip.settings",
+  SKILL_INPUT_MEMORY: "skillclip.skill-input-memory"
 };
 
 export const MESSAGE_TYPES = {
@@ -38,6 +39,8 @@ export const MESSAGE_TYPES = {
   UPDATE_VARIANT: "skillclip/update-variant",
   UPDATE_SETTINGS: "skillclip/update-settings",
   GET_SETTINGS: "skillclip/get-settings",
+  GET_SKILL_INPUT_MEMORY: "skillclip/get-skill-input-memory",
+  SAVE_SKILL_INPUT_MEMORY: "skillclip/save-skill-input-memory",
   TEST_API_CONNECTION: "skillclip/test-api-connection",
   RUN_SKILL_CHECK: "skillclip/run-skill-check",
   RUN_WORKFLOW_PROMPT_CHECK: "skillclip/run-workflow-prompt-check",

@@ -3,6 +3,41 @@ import { MESSAGE_TYPES } from "../../lib/constants.js";
 let latestState = null;
 let selectedAssetSnapshot = null;
 
+const PLATFORM_PRESETS = [
+  "chatgpt",
+  "claude",
+  "gemini",
+  "deepseek",
+  "perplexity",
+  "kimi",
+  "doubao",
+  "yuanbao",
+  "qwen",
+  "copilot",
+  "other"
+];
+
+const SCENARIO_PRESETS = [
+  "Podcast interview planning",
+  "Interview outline generation",
+  "Product PRD writing",
+  "Marketing copy generation",
+  "SQL debugging",
+  "Research synthesis",
+  "Meeting summary",
+  "Writing assistant",
+  "Coding workflow",
+  "Learning plan",
+  "Content repurposing",
+  "Social post generation",
+  "Video script writing",
+  "Sales outreach",
+  "Customer support reply",
+  "Translation refinement",
+  "Prompt optimization",
+  "Workflow automation"
+];
+
 const SUPPORTED_HOSTS = [
   "chatgpt.com",
   "chat.openai.com",
@@ -257,8 +292,14 @@ function populateAssetFilters(state) {
     ...state.skills,
     ...state.variants
   ];
-  const platforms = collectUniqueGroupKeys(assets.map((item) => getAssetPlatform(item, state)));
-  const scenarios = collectUniqueGroupKeys(assets.map((item) => getAssetScenario(item, state)));
+  const platforms = collectUniqueGroupKeys([
+    ...PLATFORM_PRESETS,
+    ...assets.map((item) => getAssetPlatform(item, state))
+  ]);
+  const scenarios = collectUniqueGroupKeys([
+    ...SCENARIO_PRESETS,
+    ...assets.map((item) => getAssetScenario(item, state))
+  ]);
 
   platformSelect.innerHTML = [`<option value="all">All / 全部</option>`, ...platforms.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`)].join("");
   scenarioSelect.innerHTML = [`<option value="all">All / 全部</option>`, ...scenarios.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`)].join("");

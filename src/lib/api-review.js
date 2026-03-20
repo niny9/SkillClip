@@ -25,6 +25,7 @@ export async function extractSkillDraftWithApi(payload, fallbackDraft, settings)
             "name, whatItDoes, scenario, useWhen, notFor, goal, inputs, workflowPrompts, promptTemplate, outputFormat, steps, successCriteria.",
             "name must be concise, specific, and usually within 3-10 words.",
             "whatItDoes must explain the reusable capability in one sentence.",
+            "Write the result in Simplified Chinese unless the source clearly requires another language.",
             "useWhen must say when the skill should be used.",
             "notFor must say when it should not be used.",
             "goal must describe the user outcome.",
@@ -153,6 +154,7 @@ export async function optimizePromptWithApi(conversation, settings) {
             "optimizedPrompt must preserve intent but improve structure and clarity.",
             "optimizedPrompt must be Markdown with sections: ROLE, TASK, CONTEXT, REQUIREMENTS, OUTPUT FORMAT.",
             "Do not simply paraphrase the original request. Reframe it as a reusable high-quality prompt.",
+            "Write the result in Simplified Chinese unless the source clearly requires another language.",
             "scenario must summarize the use case in one short phrase."
           ].join(" ")
         },
@@ -274,7 +276,8 @@ export async function optimizeWorkflowTurnsWithApi(payload, settings) {
             "Create one workflow prompt for each meaningful user turn, in order.",
             "Each prompt must be optimized, concise, and reusable.",
             "Do not copy the raw chat wording unless necessary.",
-            "Each prompt should use a strong structure suitable for repeated use."
+            "Each prompt should use a strong structure suitable for repeated use.",
+            "Write the prompts in Simplified Chinese unless the source clearly requires another language."
           ].join(" ")
         },
         {

@@ -14,6 +14,7 @@ import {
   findVariantById,
   getAllState,
   getSettings,
+  getSkillInputMemory,
   insertConversation,
   insertDraft,
   insertSkill,
@@ -26,6 +27,7 @@ import {
   restoreConversation,
   restoreDraft,
   restoreSkill,
+  saveSkillInputMemory,
   seedDemoSkillIfNeeded,
   updateConversation,
   updateSettings,
@@ -128,6 +130,14 @@ async function handleMessage(message, sender) {
       return updateSettingsItem(message.payload);
     case MESSAGE_TYPES.GET_SETTINGS:
       return getSettings();
+    case MESSAGE_TYPES.GET_SKILL_INPUT_MEMORY:
+      return getSkillInputMemory(message.payload.skillId, message.payload.platform || "global");
+    case MESSAGE_TYPES.SAVE_SKILL_INPUT_MEMORY:
+      return saveSkillInputMemory(
+        message.payload.skillId,
+        message.payload.platform || "global",
+        message.payload.values || {}
+      );
     case MESSAGE_TYPES.TEST_API_CONNECTION:
       return testApiConnection(message.payload);
     case MESSAGE_TYPES.RUN_SKILL_CHECK:

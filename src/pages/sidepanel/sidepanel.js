@@ -32,7 +32,7 @@ function setFeedback(message) {
 async function sendToActiveTab(message) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
-    setFeedback("No active tab found.");
+    setFeedback("没有找到当前活动页面。");
     return;
   }
 
@@ -42,16 +42,16 @@ async function sendToActiveTab(message) {
       payload: { tabId: tab.id }
     });
     await chrome.tabs.sendMessage(tab.id, message);
-    setFeedback("Action sent to active tab.");
+    setFeedback("已发送到当前页面。");
   } catch (error) {
-    setFeedback("Could not reach the active page. This tab may not allow injection yet.");
+    setFeedback("当前页面暂时无法连接，可能还没完成注入。");
   }
 }
 
 async function applySkillToActiveTab(skill) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
-    setFeedback("No active tab found.");
+    setFeedback("没有找到当前活动页面。");
     return;
   }
 
@@ -69,19 +69,19 @@ async function applySkillToActiveTab(skill) {
         type: MESSAGE_TYPES.INSERT_SKILL,
         payload: { skillId: skill.id }
       });
-      setFeedback(`Applied skill to current input / 已应用到当前输入框: ${skill.name}`);
+      setFeedback(`已把技能应用到当前输入框：${skill.name}`);
     } else {
-      setFeedback("Could not apply this skill to the current page.");
+      setFeedback("当前页面应用这个技能失败，请确认输入框已聚焦。");
     }
   } catch (error) {
-    setFeedback("Could not reach the active page. Make sure an AI input is focused.");
+    setFeedback("当前页面无法连接，请先聚焦到 AI 输入框。");
   }
 }
 
 function renderList(selector, items, renderer) {
   const container = document.querySelector(selector);
   if (!items.length) {
-    container.innerHTML = "<p class='muted'>Nothing here yet.</p>";
+    container.innerHTML = "<p class='muted'>这里还没有内容。</p>";
     return;
   }
 
@@ -91,11 +91,13 @@ function renderList(selector, items, renderer) {
 function renderSkills(selector, skills, variants) {
   const container = document.querySelector(selector);
   if (!skills.length) {
-    container.innerHTML = "<p class='muted'>No validated skills yet.</p>";
+    container.innerHTML = "<p class='muted'>还没有可复用技能。</p>";
     return;
   }
 
-  container.innerHTML = skills
+  const sortedSkills = [...skills].sort((left, right) => rankSkill(right) - rankSkill(left));
+
+  container.innerHTML = sortedSkills
     .map((skill) => {
       const variantsForSkill = variants.filter((variant) => variant.baseSkillId === skill.id || variant.baseSkillId === skill.baseSkillId);
       return renderSkill(skill, variantsForSkill);
@@ -106,7 +108,7 @@ function renderSkills(selector, skills, variants) {
 function renderVariants(selector, variants, skills) {
   const container = document.querySelector(selector);
   if (!variants.length) {
-    container.innerHTML = "<p class='muted'>No variants yet.</p>";
+    container.innerHTML = "<p class='muted'>还没有同场景优化版本。</p>";
     return;
   }
 
@@ -116,6 +118,29 @@ function renderVariants(selector, variants, skills) {
       skills.find((skill) => skill.id === variant.baseSkillId || skill.baseSkillId === variant.baseSkillId)
     ))
     .join("");
+}
+
+function rankSkill(skill) {
+  const qualityScore = (skill.workflowPrompts || []).reduce((sum, item) => sum + (item.quality?.score || 0), 0);
+  const averageQuality = skill.workflowPrompts?.length ? qualityScore / skill.workflowPrompts.length : 0;
+  const usage = skill.usageCount || 0;
+  const platformMatch = (skill.preferredForPlatforms || []).includes(getCurrentPlatformHint()) ? 25 : 0;
+  return averageQuality + usage * 4 + platformMatch;
+}
+
+function getCurrentPlatformHint() {
+  const activeLabel = document.querySelector("[data-feedback]")?.textContent || "";
+  const normalized = activeLabel.toLowerCase();
+  if (normalized.includes("chatgpt")) return "chatgpt";
+  if (normalized.includes("claude")) return "claude";
+  if (normalized.includes("gemini")) return "gemini";
+  if (normalized.includes("deepseek")) return "deepseek";
+  if (normalized.includes("kimi")) return "kimi";
+  if (normalized.includes("doubao")) return "doubao";
+  if (normalized.includes("yuanbao")) return "yuanbao";
+  if (normalized.includes("qwen")) return "qwen";
+  if (normalized.includes("copilot")) return "copilot";
+  return "";
 }
 
 function renderConversation(item) {
@@ -138,13 +163,13 @@ function renderConversation(item) {
       <span class="queue-badge">Raw capture / 原始素材</span>
       <span>Source / 来源: ${escapeHtml(item.sourcePlatform || "other")} · Mode / 方式: ${escapeHtml(item.captureMode)}</span>
       <div class="meta-block">
-        <small>${hasAutoDraft ? `Auto suggestion ready / 已自动整理: ${escapeHtml(linkedDraft.status === "draft" ? "可编辑草稿" : "自动建议")}` : "No auto suggestion yet / 还没有自动整理结果。"}</small>
+        <small>${hasAutoDraft ? `已自动整理：${escapeHtml(linkedDraft.status === "draft" ? "可编辑草稿" : "自动建议")}` : "还没有自动整理结果。"}</small>
         <small>${escapeHtml(summaryText)}</small>
       </div>
       <div class="action-row">
         ${editButton}
         <button type="button" data-action="promote-conversation" data-id="${item.id}">${directActionLabel}</button>
-        <button type="button" data-action="delete-conversation" data-id="${item.id}">Delete / 删除</button>
+        <button type="button" data-action="delete-conversation" data-id="${item.id}">删除</button>
       </div>
     </article>
   `;
@@ -155,17 +180,17 @@ function renderSkill(item, variantsForSkill = []) {
   return `
     <article class="list-card clickable-card" data-detail-kind="skill" data-detail-id="${item.id}">
       <strong>${escapeHtml(item.name)}</strong>
-      <span>Ready Skill / 可复用技能 · ${escapeHtml(item.scenario || "Reusable workflow")} · Used ${item.usageCount || 0} times</span>
+      <span>可复用技能 · ${escapeHtml(item.scenario || "可复用工作流")} · 已使用 ${item.usageCount || 0} 次</span>
       <div class="meta-block">
         ${platforms ? `<small>Platforms / 平台: ${escapeHtml(platforms)}</small>` : ""}
         <small>Variants / 变体数: ${variantsForSkill.length}</small>
-        ${variantsForSkill.length ? variantsForSkill.map((variant) => `<small>${escapeHtml(variant.name)}</small>`).join("") : "<small>No variants yet.</small>"}
+        ${variantsForSkill.length ? variantsForSkill.map((variant) => `<small>${escapeHtml(variant.name)}</small>`).join("") : "<small>还没有优化版本。</small>"}
       </div>
       <div class="action-row">
-        <button type="button" data-action="edit-skill" data-id="${item.id}">Edit / 编辑</button>
+        <button type="button" data-action="edit-skill" data-id="${item.id}">编辑</button>
         <button type="button" data-action="apply-skill" data-id="${item.id}">Apply Now / 立即应用</button>
-        <button type="button" data-action="create-variant" data-id="${item.id}">Create Alternative / 新建优化版</button>
-        <button type="button" data-action="delete-skill" data-id="${item.id}">Delete / 删除</button>
+        <button type="button" data-action="create-variant" data-id="${item.id}">新建优化版</button>
+        <button type="button" data-action="delete-skill" data-id="${item.id}">删除</button>
       </div>
     </article>
   `;
@@ -176,14 +201,14 @@ function renderVariant(item, baseSkill) {
   return `
     <article class="list-card clickable-card" data-detail-kind="variant" data-detail-id="${item.id}">
       <strong>${escapeHtml(item.name)}</strong>
-      <span>Alternative / 优化版本 · For Skill / 所属技能: ${escapeHtml(baseSkill?.name || item.baseSkillId)}</span>
+      <span>同场景优化版本 · 所属技能：${escapeHtml(baseSkill?.name || item.baseSkillId)}</span>
       <div class="meta-block">
         ${platforms ? `<small>Platforms / 平台: ${escapeHtml(platforms)}</small>` : ""}
         <small>${escapeHtml(item.changeSummary || "Variant")}</small>
       </div>
       <div class="action-row">
-        <button type="button" data-action="edit-variant" data-id="${item.id}">Edit / 编辑</button>
-        <button type="button" data-action="delete-variant" data-id="${item.id}">Delete / 删除</button>
+        <button type="button" data-action="edit-variant" data-id="${item.id}">编辑</button>
+        <button type="button" data-action="delete-variant" data-id="${item.id}">删除</button>
       </div>
     </article>
   `;
@@ -213,7 +238,7 @@ async function ensureDraftFromConversation(conversationId) {
 async function promoteConversationDirectly(conversationId) {
   let draft = await ensureDraftFromConversation(conversationId);
   if (!draft?.id) {
-    setFeedback("Could not generate a skill suggestion from this source.");
+    setFeedback("没能根据这条素材生成技能建议。");
     return;
   }
 
@@ -231,7 +256,7 @@ async function promoteConversationDirectly(conversationId) {
       payload: { draftId: draft.id }
     });
     const skill = promoted?.result || null;
-    setFeedback(`Promoted to reusable skill / 已升级为正式技能: ${skill?.name || ""}`);
+    setFeedback(`已升级为正式技能：${skill?.name || ""}`);
     await load();
   }
 }
@@ -239,11 +264,11 @@ async function promoteConversationDirectly(conversationId) {
 async function openConversationDraftDetail(conversationId) {
   const draft = await ensureDraftFromConversation(conversationId);
   if (!draft) {
-    setFeedback("Could not open a suggested skill for this source.");
+    setFeedback("没能打开这条素材对应的技能建议。");
     return;
   }
 
-  setFeedback("Suggested skill opened for editing.");
+  setFeedback("已打开自动整理出的技能建议。");
   showDetailPanel(draft, "draft");
 }
 
@@ -263,13 +288,13 @@ function showDetailPanel(item, kind) {
   updateSelectedCards();
   if (title) {
     const kindLabel = kind === "conversation"
-      ? "Prompt / 原始素材"
+      ? "原始素材"
       : kind === "draft"
-        ? "Draft / 草稿"
+        ? "技能草稿"
         : kind === "skill"
-          ? "Skill / 正式技能"
-          : "Variant / 变体";
-    title.textContent = `Selected / 当前选中: ${kindLabel} - ${item.name || item.id}`;
+          ? "可复用技能"
+          : "同场景优化版本";
+    title.textContent = `当前选中：${kindLabel} - ${item.name || item.id}`;
   }
 
   empty.hidden = true;
@@ -278,12 +303,12 @@ function showDetailPanel(item, kind) {
   if (note) {
     note.hidden = false;
     note.textContent = kind === "conversation"
-      ? "Prompt detail stays simple: source, title, and captured content. Structured fields only belong to reusable skills."
+      ? "原始素材只保留来源、标题和捕获内容。结构化字段只属于技能。"
       : kind === "skill"
-      ? "This skill can be reused directly, but the fields below are still editable."
+      ? "这条技能已经可复用，但下面的字段仍然可以继续编辑。"
       : kind === "variant"
-        ? "This is your manual alternative version for the same scenario. Edit it freely."
-        : "This is an auto-generated draft suggestion. You should edit it before promoting it to a reusable skill.";
+        ? "这是你手动分出来的同场景优化版本，可以继续自由修改。"
+        : "这是自动生成的技能草稿建议，升级成正式技能前建议先编辑。";
   }
   if (kind === "conversation") {
     promptForm.elements.id.value = item.id || "";
@@ -358,7 +383,7 @@ function hideDetailPanel() {
   form.reset();
   empty.hidden = false;
   if (title) {
-    title.textContent = "Nothing selected / 当前未选中任何条目";
+    title.textContent = "当前未选中任何条目";
   }
   if (note) {
     note.hidden = true;
@@ -438,7 +463,7 @@ function renderOptimizedPrompt(item) {
   panel.hidden = false;
   content.innerHTML = `
     <article class="list-card">
-      <strong>${escapeHtml(item.optimizedTitle || "Optimized Prompt")}</strong>
+      <strong>${escapeHtml(item.optimizedTitle || "优化后的 Prompt")}</strong>
       ${item.inferredScenario ? `<span>${escapeHtml(item.inferredScenario)}</span>` : ""}
       <div class="meta-block">
         <small>${escapeHtml(item.optimizedPrompt)}</small>
@@ -463,19 +488,19 @@ function renderWorkflowPromptsPreview(items) {
   panel.hidden = false;
   content.innerHTML = items.map((item, index) => `
     <article class="list-card">
-      <strong>Prompt ${index + 1} · ${escapeHtml(item.title || `Prompt ${index + 1}`)}</strong>
+      <strong>第 ${index + 1} 条 · ${escapeHtml(item.title || `工作流 Prompt ${index + 1}`)}</strong>
       <span>${escapeHtml(item.prompt || "")}</span>
       <div class="meta-block">
-        <small>Maps to step / 对应步骤: ${index + 1}</small>
-        ${item.quality ? `<small>Quality / 质量分: ${escapeHtml(String(item.quality.score))} · Priority / 优先级: ${escapeHtml(item.quality.priority)}</small>` : ""}
-        ${item.sourceTurnIds?.length ? `<small>Source turns / 来源轮次: ${escapeHtml(item.sourceTurnIds.join(", "))}</small>` : "<small>No linked source turns yet.</small>"}
+        <small>对应步骤：第 ${index + 1} 步</small>
+        ${item.quality ? `<small>质量分：${escapeHtml(String(item.quality.score))} · 优先级：${escapeHtml(item.quality.priority)}</small>` : ""}
+        ${item.sourceTurnIds?.length ? `<small>来源轮次：${escapeHtml(item.sourceTurnIds.join(", "))}</small>` : "<small>还没有关联到来源轮次。</small>"}
       </div>
       <div class="action-row">
-        <button type="button" data-action="edit-workflow-prompt" data-index="${index}">Edit / 编辑</button>
-        <button type="button" data-action="optimize-workflow-prompt-inline" data-index="${index}">Optimize / 一键优化</button>
-        <button type="button" data-action="run-workflow-prompt-check" data-index="${index}">Run Prompt Check / 检查这条 Prompt</button>
+        <button type="button" data-action="edit-workflow-prompt" data-index="${index}">编辑</button>
+        <button type="button" data-action="optimize-workflow-prompt-inline" data-index="${index}">一键优化</button>
+        <button type="button" data-action="run-workflow-prompt-check" data-index="${index}">检查这条 Prompt</button>
       </div>
-      ${item.sourceTurnIds?.length ? `<div class="action-row">${item.sourceTurnIds.map((turnId) => `<button type="button" data-action="jump-to-turn" data-turn-id="${escapeHtml(turnId)}">Jump to ${escapeHtml(turnId)}</button>`).join("")}</div>` : ""}
+      ${item.sourceTurnIds?.length ? `<div class="action-row">${item.sourceTurnIds.map((turnId) => `<button type="button" data-action="jump-to-turn" data-turn-id="${escapeHtml(turnId)}">定位到 ${escapeHtml(turnId)}</button>`).join("")}</div>` : ""}
     </article>
   `).join("");
 }
@@ -503,24 +528,24 @@ function renderWorkflowPromptEditor(item, index, promptCheck = null) {
   form.elements.prompt.value = item.prompt || "";
   checkNode.innerHTML = promptCheck
     ? `
-      <article class="list-card">
-        <strong>${escapeHtml(promptCheck.ok ? "Usable / 可用" : "Needs Work / 需继续优化")}</strong>
+      <article class="list-card ${promptCheck.running ? "status-running" : ""}">
+        <strong>${escapeHtml(promptCheck.running ? "正在检查这条 Prompt..." : promptCheck.ok ? "这条 Prompt 可以使用" : "这条 Prompt 还需要继续优化")}</strong>
         <span>${escapeHtml(promptCheck.summary || "")}</span>
         ${(Array.isArray(promptCheck.issues) && promptCheck.issues.length)
           ? `<div class="meta-block"><small>${escapeHtml(promptCheck.issues.join(" | "))}</small></div>`
-          : "<p class='muted'>No prompt-level issues reported.</p>"}
+          : "<p class='muted'>当前没有额外的 Prompt 级问题。</p>"}
       </article>
     `
     : `
       <div class="meta-block">
-        ${item.quality ? `<small>Quality / 质量分: ${escapeHtml(String(item.quality.score))} · Priority / 优先级: ${escapeHtml(item.quality.priority)}</small>` : ""}
+        ${item.quality ? `<small>质量分：${escapeHtml(String(item.quality.score))} · 优先级：${escapeHtml(item.quality.priority)}</small>` : ""}
         ${(Array.isArray(item.quality?.issues) && item.quality.issues.length)
           ? `<small>${escapeHtml(item.quality.issues.join(" | "))}</small>`
-          : "<small>No quality warnings.</small>"}
+          : "<small>当前没有明显的质量警告。</small>"}
       </div>
       ${(item.previousPrompt || item.previousTitle)
-        ? `<details class="raw-json-wrap"><summary>Previous Version / 上一版本</summary><div class="meta-block"><small>${escapeHtml(item.previousTitle || "")}</small><small>${escapeHtml(item.previousPrompt || "")}</small></div></details>`
-        : "<p class='muted'>Edit one workflow prompt here, then save or run a single prompt check.</p>"}
+        ? `<details class="raw-json-wrap"><summary>上一版本</summary><div class="meta-block"><small>${escapeHtml(item.previousTitle || "")}</small><small>${escapeHtml(item.previousPrompt || "")}</small></div></details>`
+        : "<p class='muted'>你可以在这里编辑单条工作流 Prompt，然后保存或单独检查。</p>"}
     `;
 }
 
@@ -540,21 +565,21 @@ function renderRunCheckPreview(result) {
   panel.hidden = false;
   const issues = result.issues?.length
     ? `<ul class="detail-list">${result.issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join("")}</ul>`
-    : "<p class='muted'>No blocking issues reported.</p>";
+    : "<p class='muted'>当前没有明显的阻塞问题。</p>";
   const promptChecks = Array.isArray(result.promptChecks) && result.promptChecks.length
     ? `
       <div class="meta-block">
-        <small>Workflow prompt checks / 工作流 Prompt 检查</small>
+        <small>工作流 Prompt 检查</small>
       </div>
       ${result.promptChecks.map((item, index) => `
         <article class="list-card">
           <strong>Prompt ${index + 1} · ${escapeHtml(item.title || `Prompt ${index + 1}`)}</strong>
-          <span>${escapeHtml(item.ok ? "Usable / 可用" : "Needs Work / 需继续优化")}</span>
+          <span>${escapeHtml(item.ok ? "可用" : "还需要继续优化")}</span>
           <div class="meta-block">
             <small>${escapeHtml(item.summary || "")}</small>
             ${(Array.isArray(item.issues) && item.issues.length)
               ? `<small>${escapeHtml(item.issues.join(" | "))}</small>`
-              : "<small>No prompt-level issues reported.</small>"}
+              : "<small>这条 Prompt 当前没有额外问题。</small>"}
           </div>
         </article>
       `).join("")}
@@ -563,10 +588,10 @@ function renderRunCheckPreview(result) {
 
   content.innerHTML = `
     <article class="list-card">
-      <strong>${escapeHtml(result.ok ? "Usable / 可用" : "Needs Work / 需继续优化")}</strong>
+      <strong>${escapeHtml(result.ok ? "整体技能可以使用" : "整体技能还需要继续优化")}</strong>
       <span>${escapeHtml(result.summary || "")}</span>
-      ${result.checkedAt ? `<p class="muted">Checked at / 检查时间: ${escapeHtml(result.checkedAt)}</p>` : ""}
-      ${result.outputPreview ? `<div class="meta-block"><small>Output preview / 输出预览</small><small>${escapeHtml(result.outputPreview.slice(0, 800))}</small></div>` : ""}
+      ${result.checkedAt ? `<p class="muted">检查时间：${escapeHtml(result.checkedAt)}</p>` : ""}
+      ${result.outputPreview ? `<div class="meta-block"><small>输出预览</small><small>${escapeHtml(result.outputPreview.slice(0, 800))}</small></div>` : ""}
       ${issues}
     </article>
     ${promptChecks}
@@ -599,10 +624,10 @@ function renderStepMapPreview(stepSources, fallbackItems = []) {
   panel.hidden = false;
   content.innerHTML = stepSources.map((item, index) => `
     <article class="list-card">
-      <strong>Step ${index + 1}</strong>
+      <strong>第 ${index + 1} 步</strong>
       <span>${escapeHtml(item.step || "")}</span>
-      ${item.sourceTurnIds?.length ? `<div class="action-row">${item.sourceTurnIds.map((turnId) => `<button type="button" data-action="jump-to-turn" data-turn-id="${escapeHtml(turnId)}">Jump to ${escapeHtml(turnId)}</button>`).join("")}</div>` : ""}
-      ${item.sourcePreview ? `<div class="meta-block"><small>Source preview / 来源摘要</small><small>${escapeHtml(item.sourcePreview)}</small></div>` : ""}
+      ${item.sourceTurnIds?.length ? `<div class="action-row">${item.sourceTurnIds.map((turnId) => `<button type="button" data-action="jump-to-turn" data-turn-id="${escapeHtml(turnId)}">定位到 ${escapeHtml(turnId)}</button>`).join("")}</div>` : ""}
+      ${item.sourcePreview ? `<div class="meta-block"><small>来源摘要</small><small>${escapeHtml(item.sourcePreview)}</small></div>` : ""}
     </article>
   `).join("");
 }
@@ -675,7 +700,7 @@ function renderValidationPreview(validation) {
   panel.hidden = false;
   const issues = validation.issues?.length
     ? validation.issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join("")
-    : "<li>No major issues found.</li>";
+    : "<li>当前没有明显问题。</li>";
 
   content.innerHTML = `
     <div class="validation-card status-${escapeHtml(validation.status || "unknown")}">
@@ -685,8 +710,8 @@ function renderValidationPreview(validation) {
         </div>
         ${validation.score != null ? `<strong class="validation-score">${escapeHtml(String(validation.score))}</strong>` : ""}
       </div>
-      <p class="muted">${validation.checkedAt ? `Checked at / 检查时间: ${escapeHtml(validation.checkedAt)}` : "No timestamp yet."}</p>
-      <p class="muted">Runs automatically on preview generation, save, and promote.</p>
+      <p class="muted">${validation.checkedAt ? `检查时间：${escapeHtml(validation.checkedAt)}` : "暂时还没有检查时间。"}</p>
+      <p class="muted">会在生成草稿、保存编辑、升级技能时自动运行。</p>
       <ul class="detail-list">${issues}</ul>
     </div>
   `;
@@ -708,7 +733,7 @@ function renderVariantCompare(item, kind) {
   const baseSkill = latestState.skills.find((skill) => skill.id === item.baseSkillId || skill.baseSkillId === item.baseSkillId);
   if (!baseSkill) {
     panel.hidden = false;
-    content.innerHTML = "<p class='muted'>No base skill found for this variant.</p>";
+    content.innerHTML = "<p class='muted'>这条优化版本还没有找到对应的基础技能。</p>";
     return;
   }
 
@@ -716,14 +741,14 @@ function renderVariantCompare(item, kind) {
   content.innerHTML = `
     <article class="list-card">
       <strong>${escapeHtml(baseSkill.name || "Base skill")}</strong>
-      <span>${escapeHtml(baseSkill.scenario || "No scenario")}</span>
+      <span>${escapeHtml(baseSkill.scenario || "暂未填写场景")}</span>
       <div class="meta-block">
         <small>Base prompt / 基础模板</small>
-        <small>${escapeHtml((baseSkill.promptTemplate || "").slice(0, 220) || "No prompt template")}</small>
+        <small>${escapeHtml((baseSkill.promptTemplate || "").slice(0, 220) || "暂时还没有运行手册")}</small>
       </div>
       <div class="meta-block">
         <small>Your variant focus / 你的优化点</small>
-        <small>${escapeHtml(item.changeSummary || "No change summary yet.")}</small>
+        <small>${escapeHtml(item.changeSummary || "暂时还没有填写优化重点。")}</small>
       </div>
     </article>
   `;
@@ -747,7 +772,7 @@ function renderSourcePreview(item) {
 
   if (!sources.length) {
     sourcePanel.hidden = false;
-    sourceContent.innerHTML = "<p class='muted'>No linked source conversation yet.</p>";
+    sourceContent.innerHTML = "<p class='muted'>这条技能暂时还没有关联来源对话。</p>";
     return;
   }
 
@@ -758,7 +783,7 @@ function renderSourcePreview(item) {
 function renderSelectedCount() {
   const node = document.querySelector("[data-selected-count]");
   if (node) {
-    node.textContent = `Selected / 已选择: ${selectedConversationIds.size}`;
+    node.textContent = `已选择：${selectedConversationIds.size}`;
   }
 }
 
@@ -775,18 +800,18 @@ function renderSourceCard(source) {
 
   return `
     <article class="list-card source-card">
-      <strong>${escapeHtml(source.sourceTitle || source.selectedText || "Source conversation")}</strong>
+      <strong>${escapeHtml(source.sourceTitle || source.selectedText || "原始对话")}</strong>
       <span>Platform / 平台: ${escapeHtml(source.sourcePlatform || "other")}</span>
       <span>Mode / 方式: ${escapeHtml(source.captureMode || "unknown")}</span>
       ${source.selectedText ? `<div class="meta-block"><small>Selected text / 选中文本</small><small>${escapeHtml(source.selectedText.slice(0, 180))}</small></div>` : ""}
       <details class="raw-json-wrap">
-        <summary>View full source timeline / 查看完整来源时间线</summary>
+        <summary>查看完整来源时间线</summary>
         <div class="meta-block"><small>URL</small><small>${escapeHtml(source.sourceUrl || "")}</small></div>
-        ${turnsPreview ? `<div class="source-turns"><small>Conversation timeline / 对话时间线</small>${turnsPreview}</div>` : ""}
+        ${turnsPreview ? `<div class="source-turns"><small>对话时间线</small>${turnsPreview}</div>` : ""}
       </details>
       <div class="action-row">
-        <button type="button" data-action="re-save-source-prompt" data-source-id="${source.id}">Save Source as Prompt / 另存为 Prompt</button>
-        <button type="button" data-action="recompile-source-skill" data-source-id="${source.id}">Recompile to Draft / 重新编译为草稿</button>
+        <button type="button" data-action="re-save-source-prompt" data-source-id="${source.id}">另存为 Prompt</button>
+        <button type="button" data-action="recompile-source-skill" data-source-id="${source.id}">重新编译为草稿</button>
       </div>
     </article>
   `;
@@ -852,7 +877,7 @@ document.addEventListener("click", async (event) => {
 
   if (action === "approve-preview" && id) {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.APPROVE_DRAFT_PREVIEW, payload: { draftId: id } });
-    setFeedback("Preview saved as draft.");
+    setFeedback("已把当前预览保存为草稿。");
     return;
   }
 
@@ -863,7 +888,7 @@ document.addEventListener("click", async (event) => {
 
   if (action === "delete-conversation" && id) {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.DELETE_CONVERSATION, payload: { conversationId: id } });
-    setFeedback("Conversation deleted.");
+    setFeedback("这条原始素材已删除。");
     hideDetailPanel();
     return;
   }
@@ -875,7 +900,7 @@ document.addEventListener("click", async (event) => {
 
   if (action === "compile-selected") {
     if (selectedConversationIds.size === 0) {
-      setFeedback("Select at least one prompt first / 请先选择至少一条 Prompt。");
+      setFeedback("请先选择至少一条 Prompt。");
       return;
     }
 
@@ -887,7 +912,7 @@ document.addEventListener("click", async (event) => {
     await load();
     if (draft) {
       showDetailPanel(draft, "draft");
-      setFeedback("Combined skill draft created from selected prompts / 已根据选中的 Prompt 生成技能草稿。");
+      setFeedback("已根据选中的 Prompt 生成技能草稿。");
     }
     return;
   }
@@ -899,14 +924,14 @@ document.addEventListener("click", async (event) => {
 
   if (action === "delete-draft" && id) {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.DELETE_DRAFT, payload: { draftId: id } });
-    setFeedback("Draft deleted.");
+    setFeedback("这条草稿已删除。");
     hideDetailPanel();
     return;
   }
 
   if (action === "delete-skill" && id) {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.DELETE_SKILL, payload: { skillId: id } });
-    setFeedback("Skill deleted.");
+    setFeedback("这条技能已删除。");
     hideDetailPanel();
     return;
   }
@@ -929,12 +954,12 @@ document.addEventListener("click", async (event) => {
 
   if (action === "run-skill-check") {
     if (!selectedDetail || selectedDetail.kind === "conversation") {
-      setFeedback("Select a draft, skill, or variant first.");
+      setFeedback("请先选中一条草稿、技能或优化版本。");
       return;
     }
     renderRunCheckPreview({
       ok: false,
-      summary: "Running live skill check...",
+      summary: "正在执行整条技能的试运行检查，请稍等...",
       outputPreview: "",
       issues: [],
       checkedAt: ""
@@ -945,78 +970,84 @@ document.addEventListener("click", async (event) => {
     });
     latestRunCheck = response?.result || null;
     renderRunCheckPreview(latestRunCheck);
-    setFeedback("Skill check finished.");
+    setFeedback("技能试运行检查已完成。");
     return;
   }
 
   if (action === "edit-workflow-prompt") {
     if (!selectedDetail || selectedDetail.kind === "conversation") {
-      setFeedback("Select a draft, skill, or variant first.");
+      setFeedback("请先选中一条草稿、技能或优化版本。");
       return;
     }
     const asset = getCurrentDetailAsset();
     const index = Number(target.dataset.index);
     const prompt = asset?.workflowPrompts?.[index];
     if (!prompt) {
-      setFeedback("Workflow prompt not found.");
+      setFeedback("没有找到这条工作流 Prompt。");
       return;
     }
     renderWorkflowPromptEditor(prompt, index);
-    setFeedback("Workflow prompt opened for editing.");
+    setFeedback("已打开这条工作流 Prompt，准备编辑。");
     return;
   }
 
   if (action === "run-workflow-prompt-check") {
     if (!selectedDetail || selectedDetail.kind === "conversation") {
-      setFeedback("Select a draft, skill, or variant first.");
+      setFeedback("请先选中一条草稿、技能或优化版本。");
       return;
     }
     const asset = getCurrentDetailAsset();
     const index = Number(target.dataset.index ?? selectedWorkflowPrompt?.index);
     if (!Number.isInteger(index) || index < 0) {
-      setFeedback("Choose a workflow prompt first.");
+      setFeedback("请先选择一条工作流 Prompt。");
       return;
     }
     const prompt = asset?.workflowPrompts?.[index];
     if (!prompt) {
-      setFeedback("Workflow prompt not found.");
+      setFeedback("没有找到这条工作流 Prompt。");
       return;
     }
     renderWorkflowPromptEditor(prompt, index, {
       ok: false,
-      summary: "Running single prompt check...",
+      running: true,
+      summary: "系统正在调用模型检查这条 Prompt，请稍等。",
       issues: []
     });
+    setFeedback(`正在检查第 ${index + 1} 条工作流 Prompt...`);
     const response = await chrome.runtime.sendMessage({
       type: MESSAGE_TYPES.RUN_WORKFLOW_PROMPT_CHECK,
       payload: { id: selectedDetail.id, index }
     });
-    renderWorkflowPromptEditor(prompt, index, response?.result || null);
-    setFeedback("Workflow prompt check finished.");
+    const latestAsset = getCurrentDetailAsset();
+    const latestPrompt = latestAsset?.workflowPrompts?.[index] || prompt;
+    renderWorkflowPromptEditor(latestPrompt, index, response?.result || null);
+    setFeedback(`第 ${index + 1} 条工作流 Prompt 检查已完成。`);
     return;
   }
 
   if (action === "optimize-workflow-prompt") {
     if (!selectedDetail || selectedDetail.kind === "conversation") {
-      setFeedback("Select a draft, skill, or variant first.");
+      setFeedback("请先选中一条草稿、技能或优化版本。");
       return;
     }
     const index = Number(selectedWorkflowPrompt?.index);
     if (!Number.isInteger(index) || index < 0) {
-      setFeedback("Choose a workflow prompt first.");
+      setFeedback("请先选择一条工作流 Prompt。");
       return;
     }
     const asset = getCurrentDetailAsset();
     const prompt = asset?.workflowPrompts?.[index];
     if (!prompt) {
-      setFeedback("Workflow prompt not found.");
+      setFeedback("没有找到这条工作流 Prompt。");
       return;
     }
     renderWorkflowPromptEditor(prompt, index, {
       ok: false,
-      summary: "Optimizing workflow prompt...",
+      running: true,
+      summary: "系统正在优化这条工作流 Prompt，请稍等。",
       issues: []
     });
+    setFeedback(`正在优化第 ${index + 1} 条工作流 Prompt...`);
     const response = await chrome.runtime.sendMessage({
       type: MESSAGE_TYPES.OPTIMIZE_WORKFLOW_PROMPT,
       payload: { id: selectedDetail.id, kind: selectedDetail.kind, index }
@@ -1030,35 +1061,37 @@ document.addEventListener("click", async (event) => {
     if (nextPrompt) {
       renderWorkflowPromptEditor(nextPrompt, index, {
         ok: true,
-        summary: "Workflow prompt optimized.",
+        summary: "这条工作流 Prompt 已优化完成。",
         issues: []
       });
     }
-    setFeedback("Workflow prompt optimized.");
+    setFeedback(`第 ${index + 1} 条工作流 Prompt 已优化完成。`);
     return;
   }
 
   if (action === "optimize-workflow-prompt-inline") {
     if (!selectedDetail || selectedDetail.kind === "conversation") {
-      setFeedback("Select a draft, skill, or variant first.");
+      setFeedback("请先选中一条草稿、技能或优化版本。");
       return;
     }
     const index = Number(target.dataset.index);
     if (!Number.isInteger(index) || index < 0) {
-      setFeedback("Workflow prompt not found.");
+      setFeedback("没有找到这条工作流 Prompt。");
       return;
     }
     const asset = getCurrentDetailAsset();
     const prompt = asset?.workflowPrompts?.[index];
     if (!prompt) {
-      setFeedback("Workflow prompt not found.");
+      setFeedback("没有找到这条工作流 Prompt。");
       return;
     }
     renderWorkflowPromptEditor(prompt, index, {
       ok: false,
-      summary: "Optimizing workflow prompt...",
+      running: true,
+      summary: "系统正在优化这条工作流 Prompt，请稍等。",
       issues: []
     });
+    setFeedback(`正在优化第 ${index + 1} 条工作流 Prompt...`);
     const response = await chrome.runtime.sendMessage({
       type: MESSAGE_TYPES.OPTIMIZE_WORKFLOW_PROMPT,
       payload: { id: selectedDetail.id, kind: selectedDetail.kind, index }
@@ -1072,17 +1105,17 @@ document.addEventListener("click", async (event) => {
     if (nextPrompt) {
       renderWorkflowPromptEditor(nextPrompt, index, response?.result ? {
         ok: true,
-        summary: "Workflow prompt optimized.",
+        summary: "这条工作流 Prompt 已优化完成。",
         issues: []
       } : null);
     }
-    setFeedback("Workflow prompt optimized.");
+    setFeedback(`第 ${index + 1} 条工作流 Prompt 已优化完成。`);
     return;
   }
 
   if (action === "delete-variant" && id) {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.DELETE_VARIANT, payload: { variantId: id } });
-    setFeedback("Variant deleted.");
+    setFeedback("这条优化版本已删除。");
     hideDetailPanel();
     return;
   }
@@ -1116,13 +1149,13 @@ document.addEventListener("click", async (event) => {
 
   if (action === "open-control-center") {
     await chrome.runtime.openOptionsPage();
-    setFeedback("Control Center opened.");
+    setFeedback("已打开控制中心。");
     return;
   }
 
   if (action === "refresh-workspace") {
     await load();
-    setFeedback("Workspace refreshed.");
+    setFeedback("工作台已刷新。");
     return;
   }
 
@@ -1144,7 +1177,7 @@ document.addEventListener("click", async (event) => {
         type: MESSAGE_TYPES.SAVE_PROMPT,
         payload: buildPayloadFromConversation(source)
       });
-      setFeedback("Source saved to Inbox as prompt.");
+      setFeedback("已把来源内容另存为 Prompt。");
     }
     return;
   }
@@ -1157,14 +1190,14 @@ document.addEventListener("click", async (event) => {
         type: MESSAGE_TYPES.COMPILE_SKILL,
         payload: buildPayloadFromConversation(source)
       });
-      setFeedback("Source recompiled into a draft.");
+      setFeedback("已根据来源内容重新生成草稿。");
     }
     return;
   }
 
   if (action === "optimize-conversation") {
     if (!selectedDetail || selectedDetail.kind !== "conversation") {
-      setFeedback("Select a raw prompt first.");
+      setFeedback("请先选中一条原始素材。");
       return;
     }
     const response = await chrome.runtime.sendMessage({
@@ -1173,7 +1206,7 @@ document.addEventListener("click", async (event) => {
     });
     if (response?.result) {
       renderOptimizedPrompt(response.result);
-      setFeedback("Prompt optimized.");
+      setFeedback("这条 Prompt 已优化完成。");
       await load();
     }
     return;
@@ -1302,17 +1335,17 @@ document.querySelector("[data-detail-form]")?.addEventListener("submit", async (
 
   if (kind === "draft") {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.UPDATE_DRAFT, payload });
-    setFeedback("Draft updated.");
+    setFeedback("草稿已保存。");
   }
 
   if (kind === "skill") {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.UPDATE_SKILL, payload });
-    setFeedback("Skill updated.");
+    setFeedback("技能已保存。");
   }
 
   if (kind === "variant") {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.UPDATE_VARIANT, payload });
-    setFeedback("Variant updated.");
+    setFeedback("优化版本已保存。");
   }
 });
 
@@ -1328,13 +1361,13 @@ document.querySelector("[data-prompt-form]")?.addEventListener("submit", async (
       selectedText: String(formData.get("selectedText") || "")
     }
   });
-  setFeedback("Prompt updated.");
+  setFeedback("Prompt 已保存。");
 });
 
 document.querySelector("[data-workflow-prompt-form]")?.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!selectedDetail || selectedDetail.kind === "conversation") {
-    setFeedback("Select a draft, skill, or variant first.");
+    setFeedback("请先选中一条草稿、技能或优化版本。");
     return;
   }
 
@@ -1360,7 +1393,7 @@ document.querySelector("[data-workflow-prompt-form]")?.addEventListener("submit"
   if (prompt) {
     renderWorkflowPromptEditor(prompt, index);
   }
-  setFeedback("Workflow prompt updated.");
+  setFeedback("工作流 Prompt 已保存。");
 });
 
 load();

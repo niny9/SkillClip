@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SkillClip Workspace</title>
+    <title>SkillClip 工作台</title>
     <link rel="stylesheet" href="../shared/ui.css" />
   </head>
   <body>
@@ -24,19 +24,19 @@
         </section>
 
         <section class="card">
-          <h2>Quick Actions / 快捷操作</h2>
+          <h2>快捷操作</h2>
           <div class="action-row">
-            <button type="button" data-action="open-actionbar">Open Action Bar / 打开操作条</button>
-            <button type="button" data-action="open-palette">Open Skill Palette / 打开技能面板</button>
-            <button type="button" data-action="open-control-center">Open Control Center / 打开控制中心</button>
-            <button type="button" data-action="refresh-workspace">Sync Latest / 同步最新数据</button>
+            <button type="button" data-action="open-actionbar">打开操作条</button>
+            <button type="button" data-action="open-palette">打开技能面板</button>
+            <button type="button" data-action="open-control-center">打开控制中心</button>
+            <button type="button" data-action="refresh-workspace">同步最新数据</button>
           </div>
           <p class="muted" data-feedback>
-            Open an AI page, then use these buttons to trigger the in-page tools.
+            打开一个 AI 页面后，再用这些按钮触发页面内工具。
           </p>
           <div class="checklist">
-            <p>`Open Action Bar`：在 AI 页面打开操作条，你可以保存 Prompt、保存对话、语音输入、编译为预览。</p>
-            <p>`Open Skill Palette`：在 AI 输入框里打开技能插入面板，用来复用已经保存好的正式技能。</p>
+            <p>`打开操作条`：在 AI 页面打开操作条，你可以保存 Prompt、保存对话、语音输入、编译为预览。</p>
+            <p>`打开技能面板`：在 AI 输入框里打开技能插入面板，用来复用已经保存好的正式技能。</p>
           </div>
         </section>
 
@@ -44,14 +44,14 @@
           <h2>Raw Captures / 原始素材</h2>
           <p class="muted">这里是你保存下来的原始内容。系统会自动整理一版建议；你可以直接编辑，或者直接升级为正式技能。</p>
           <div class="action-row">
-            <button type="button" data-action="compile-selected">Create Skill From Selected / 用选中的 Prompt 生成技能</button>
-            <span class="muted" data-selected-count>Selected / 已选择: 0</span>
+            <button type="button" data-action="compile-selected">用选中的 Prompt 生成技能</button>
+            <span class="muted" data-selected-count>已选择: 0</span>
           </div>
           <div data-queue-raw class="stack"></div>
         </section>
 
         <section class="card">
-          <h2>Ready Skills / 可复用技能</h2>
+          <h2>可复用技能</h2>
           <p class="muted">这里是已经可以直接插入到 AI 对话框里的技能。</p>
           <div data-skills class="stack"></div>
         </section>
@@ -65,13 +65,13 @@
       </section>
 
       <aside class="card detail-panel">
-        <h2>Details / 详情编辑</h2>
-        <p class="muted" data-detail-title>Nothing selected / 当前未选中任何条目</p>
+        <h2>详情编辑</h2>
+        <p class="muted" data-detail-title>当前未选中任何条目</p>
         <p class="muted" data-detail-empty>
-          Click a raw capture, skill, or variant card to inspect and edit it here.
+          点击左侧的原始素材、技能或优化版本，就会在这里查看和编辑。
         </p>
         <p class="muted" data-detail-note hidden>
-          These fields are auto-generated draft suggestions from AI or local rules. Edit them before treating them as final.
+          这些内容是 AI 或本地规则自动生成的草稿建议，正式使用前请先编辑确认。
         </p>
         <form data-prompt-form hidden>
           <input type="hidden" name="id" />
@@ -86,19 +86,19 @@
           </label>
 
           <section class="detail-source-block">
-            <h3>Prompt Source / Prompt 来源</h3>
+            <h3>Prompt 来源</h3>
             <div data-prompt-meta class="stack"></div>
           </section>
 
           <section class="detail-extraction-block" data-optimized-prompt-panel hidden>
-            <h3>Optimized Prompt / 一键优化后的 Prompt</h3>
+            <h3>一键优化后的 Prompt</h3>
             <div data-optimized-prompt-content class="stack"></div>
           </section>
 
           <div class="action-row">
-            <button type="submit">Save Prompt / 保存 Prompt</button>
+            <button type="submit">保存 Prompt</button>
             <button type="button" data-action="optimize-conversation">Optimize Prompt / 一键优化</button>
-            <button type="button" data-action="clear-detail">Close / 关闭</button>
+            <button type="button" data-action="clear-detail">关闭</button>
           </div>
         </form>
         <form data-detail-form hidden>
@@ -156,66 +156,66 @@
           <div class="action-row">
             <button type="submit">Save Changes / 保存修改</button>
             <button type="button" data-action="run-skill-check">Run Skill Check / 试运行检查</button>
-            <button type="button" data-action="clear-detail">Close / 关闭</button>
+            <button type="button" data-action="clear-detail">关闭</button>
           </div>
         </form>
 
-        <section class="detail-extraction-block" data-extraction-panel hidden>
-          <h3>Extraction / 抽取来源</h3>
+        <details class="detail-extraction-block detail-fold detail-fold-extraction" data-extraction-panel hidden open>
+          <summary>抽取来源</summary>
           <div data-extraction-content class="stack"></div>
-        </section>
+        </details>
 
-        <section class="detail-validation-block" data-validation-panel hidden>
-          <h3>Quality Check / 自动检查</h3>
+        <details class="detail-validation-block detail-fold detail-fold-validation" data-validation-panel hidden open>
+          <summary>自动检查</summary>
           <div data-validation-content class="stack"></div>
-        </section>
+        </details>
 
-        <section class="detail-extraction-block" data-run-check-panel hidden>
-          <h3>Run Check / 试运行结果</h3>
+        <details class="detail-extraction-block detail-fold detail-fold-runcheck" data-run-check-panel hidden open>
+          <summary>试运行结果</summary>
           <div data-run-check-content class="stack"></div>
-        </section>
+        </details>
 
-        <section class="detail-source-block" data-step-map-panel hidden>
-          <h3>Step Mapping / 步骤来源映射</h3>
+        <details class="detail-source-block detail-fold detail-fold-stepmap" data-step-map-panel hidden>
+          <summary>步骤来源映射</summary>
           <div data-step-map-content class="stack"></div>
-        </section>
+        </details>
 
-        <section class="detail-source-block" data-workflow-prompts-panel hidden>
-          <h3>Workflow Prompts / 工作流 Prompt</h3>
+        <details class="detail-source-block detail-fold detail-fold-workflow" data-workflow-prompts-panel hidden open>
+          <summary>工作流 Prompt</summary>
           <div data-workflow-prompts-content class="stack"></div>
-        </section>
+        </details>
 
-        <section class="detail-source-block" data-workflow-editor-panel hidden>
-          <h3>Workflow Prompt Editor / 工作流 Prompt 编辑</h3>
+        <section class="detail-source-block detail-fold-workflow" data-workflow-editor-panel hidden>
+          <h3>工作流 Prompt 编辑</h3>
           <form data-workflow-prompt-form>
             <input type="hidden" name="index" />
             <label class="field-label">
-              <span>Prompt Title / Prompt 标题</span>
+              <span>Prompt 标题</span>
               <input name="title" type="text" />
             </label>
             <label class="field-label">
-              <span>Prompt Content / Prompt 内容</span>
+              <span>Prompt 内容</span>
               <textarea name="prompt" rows="8"></textarea>
             </label>
             <div class="action-row">
-              <button type="submit">Save Workflow Prompt / 保存工作流 Prompt</button>
-              <button type="button" data-action="optimize-workflow-prompt">Optimize Prompt / 一键优化</button>
-              <button type="button" data-action="run-workflow-prompt-check">Run Prompt Check / 检查这条 Prompt</button>
-              <button type="button" data-action="clear-workflow-editor">Close / 关闭</button>
+              <button type="submit">保存工作流 Prompt</button>
+              <button type="button" data-action="optimize-workflow-prompt">一键优化</button>
+              <button type="button" data-action="run-workflow-prompt-check">检查这条 Prompt</button>
+              <button type="button" data-action="clear-workflow-editor">关闭</button>
             </div>
           </form>
           <div data-workflow-prompt-check class="stack"></div>
         </section>
 
-        <section class="detail-source-block" data-compare-panel hidden>
-          <h3>Base Skill / 基础版本对比</h3>
+        <section class="detail-source-block detail-fold-validation" data-compare-panel hidden>
+          <h3>基础版本对比</h3>
           <div data-compare-content class="stack"></div>
         </section>
 
-        <section class="detail-source-block" data-source-panel hidden>
-          <h3>Source / 原始来源</h3>
+        <details class="detail-source-block detail-fold detail-fold-source" data-source-panel hidden>
+          <summary>原始来源</summary>
           <div data-source-content class="stack"></div>
-        </section>
+        </details>
       </aside>
     </main>
     <datalist id="skillclip-scenario-options">
@@ -229,6 +229,24 @@
       <option value="Writing assistant"></option>
       <option value="Coding workflow"></option>
       <option value="Learning plan"></option>
+      <option value="Content repurposing"></option>
+      <option value="Social post generation"></option>
+      <option value="Video script writing"></option>
+      <option value="Sales outreach"></option>
+      <option value="Customer support reply"></option>
+      <option value="Translation refinement"></option>
+      <option value="Prompt optimization"></option>
+      <option value="Workflow automation"></option>
+      <option value="播客访谈策划"></option>
+      <option value="访谈提纲整理"></option>
+      <option value="产品 PRD 撰写"></option>
+      <option value="营销文案生成"></option>
+      <option value="SQL 排错"></option>
+      <option value="研究总结"></option>
+      <option value="会议纪要"></option>
+      <option value="写作助手"></option>
+      <option value="代码工作流"></option>
+      <option value="学习计划"></option>
     </datalist>
     <script type="module" src="./sidepanel.js"></script>
   </body>

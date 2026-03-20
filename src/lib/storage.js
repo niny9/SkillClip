@@ -55,6 +55,24 @@ export async function getAllState() {
   };
 }
 
+export async function getSkillInputMemory(skillId, platform = "global") {
+  const result = await chrome.storage.local.get([STORAGE_KEYS.SKILL_INPUT_MEMORY]);
+  const memory = result[STORAGE_KEYS.SKILL_INPUT_MEMORY] || {};
+  return memory[`${skillId}::${platform}`] || {};
+}
+
+export async function saveSkillInputMemory(skillId, platform = "global", values) {
+  const result = await chrome.storage.local.get([STORAGE_KEYS.SKILL_INPUT_MEMORY]);
+  const memory = result[STORAGE_KEYS.SKILL_INPUT_MEMORY] || {};
+  const scopedKey = `${skillId}::${platform}`;
+  memory[scopedKey] = {
+    ...(memory[scopedKey] || {}),
+    ...(values || {})
+  };
+  await chrome.storage.local.set({ [STORAGE_KEYS.SKILL_INPUT_MEMORY]: memory });
+  return memory[scopedKey];
+}
+
 export async function insertConversation(item) {
   const bucket = await getBucket(STORAGE_KEYS.CONVERSATIONS);
   bucket.unshift(item);

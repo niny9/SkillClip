@@ -12,7 +12,7 @@ function extractVariablesFromText(text) {
     key: key.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
     label: key,
     required: true,
-    description: "Inferred variable from the captured conversation"
+    description: "从当前素材中自动识别出的变量"
   }));
 }
 
@@ -130,6 +130,112 @@ function inferPromptName(scenario, text = "") {
     .join(" ");
 
   return clean ? `${clean} Prompt` : "通用优化 Prompt";
+}
+
+function parseStructuredPromptSections(prompt = "") {
+  const lines = String(prompt || "").split("\n");
+  const sections = { body: [] };
+  let current = "body";
+
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (/^#\s*(ROLE|角色)$/i.test(trimmed)) {
+      current = "role";
+      sections[current] = [];
+      return;
+    }
+    if (/^#\s*(TASK|任务)$/i.test(trimmed)) {
+      current = "task";
+      sections[current] = [];
+      return;
+    }
+    if (/^#\s*(CONTEXT|上下文)$/i.test(trimmed)) {
+      current = "context";
+      sections[current] = [];
+      return;
+    }
+    if (/^#\s*(REQUIREMENTS|要求)$/i.test(trimmed)) {
+      current = "requirements";
+      sections[current] = [];
+      return;
+    }
+    if (/^#\s*(OUTPUT FORMAT|输出格式)$/i.test(trimmed)) {
+      current = "output";
+      sections[current] = [];
+      return;
+    }
+    if (trimmed) {
+      sections[current] ||= [];
+      sections[current].push(trimmed);
+    }
+  });
+
+  return {
+    role: (sections.role || []).join(" "),
+    task: (sections.task || []).join(" "),
+    context: (sections.context || []).join(" "),
+    requirements: (sections.requirements || []).join("\n"),
+    output: (sections.output || []).join(" "),
+    body: (sections.body || []).join(" ")
+  };
+}
+
+function compactWorkflowPromptForRunbook(item, index, previous = null) {
+  const sections = parseStructuredPromptSections(item?.prompt || "");
+  const previousSections = previous ? parseStructuredPromptSections(previous.prompt || "") : null;
+  const lines = [];
+
+  if (sections.task) {
+    lines.push(`核心动作：${sections.task}`);
+  }
+
+  if (sections.context && sections.context !== previousSections?.context) {
+    lines.push(`补充上下文：${sections.context}`);
+  }
+
+  const requirementLines = String(sections.requirements || "")
+    .split("\n")
+    .map((line) => line.replace(/^-+\s*/, "").trim())
+    .filter(Boolean)
+    .slice(0, 4);
+  if (requirementLines.length) {
+    lines.push("本步要求：");
+    requirementLines.forEach((line) => lines.push(`- ${line}`));
+  }
+
+  if (sections.output && sections.output !== previousSections?.output && index === 0) {
+    lines.push(`统一输出要求：${sections.output}`);
+  }
+
+  if (!lines.length) {
+    lines.push(String(item?.prompt || "").slice(0, 220));
+  }
+
+  return lines.join("\n");
+}
+
+function deriveWorkflowPromptLabel(text = "", scenario = "") {
+  const sections = parseStructuredPromptSections(text);
+  const source = sections.task || sections.context || sections.body || text;
+  const clean = String(source || "")
+    .replace(/^[-#\s]+/g, "")
+    .replace(/[：:]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (scenario === "Podcast interview planning") {
+    if (/嘉宾|人物|背景|guest/i.test(clean)) return "补充嘉宾信息";
+    if (/开场|opening|破冰/i.test(clean)) return "设计开场问题";
+    if (/追问|follow-up|深入/i.test(clean)) return "设计追问问题";
+    if (/总结|结尾|closing/i.test(clean)) return "设计收尾问题";
+    if (/目标|主题|方向/i.test(clean)) return "明确访谈目标";
+  }
+
+  const firstLine = clean
+    .split(/[。！？!?]/)
+    .map((part) => part.trim())
+    .filter(Boolean)[0] || clean;
+  return firstLine.slice(0, 14).trim() || "工作流步骤";
 }
 
 export function optimizePromptLocally(conversation) {
@@ -350,16 +456,7 @@ function inferWorkflowPromptTitle(text, index, scenario) {
     return index === 0 ? "定义产品问题" : `PRD 细化 ${index + 1}`;
   }
 
-  const clean = String(text || "")
-    .replace(/\s+/g, " ")
-    .replace(/[：:，,。.？?！!]/g, " ")
-    .trim()
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 5)
-    .join(" ");
-
-  return clean || `步骤提示词 ${index + 1}`;
+  return deriveWorkflowPromptLabel(text, scenario) || `步骤提示词 ${index + 1}`;
 }
 
 function optimizePromptText(text, scenario) {
@@ -377,101 +474,101 @@ function optimizePromptText(text, scenario) {
   const outputFormat = inferPromptOutputFormat(scenario);
 
   return [
-    "# ROLE",
+    "# 角色",
     role,
     "",
-    "# TASK",
+    "# 任务",
     task,
     "",
-    "# CONTEXT",
+    "# 上下文",
     clean,
     "",
-    "# REQUIREMENTS",
+    "# 要求",
     requirements.map((item) => `- ${item}`).join("\n"),
     "",
-    "# OUTPUT FORMAT",
+    "# 输出格式",
     outputFormat
   ].join("\n");
 }
 
 function inferPromptRole(scenario) {
   if (scenario === "Podcast interview planning") {
-    return "You are an expert podcast producer and interview strategist.";
+    return "你是一位专业的播客制作人与访谈策划顾问。";
   }
   if (scenario === "Interview outline generation") {
-    return "You are an expert conversation designer who turns rough notes into a usable interview flow.";
+    return "你是一位擅长把零散想法整理成可执行访谈流程的对话设计师。";
   }
   if (scenario === "Product PRD writing") {
-    return "You are a senior product manager who turns rough ideas into clear PRD drafts.";
+    return "你是一位资深产品经理，擅长把模糊想法整理成清晰的 PRD。";
   }
   if (scenario === "Marketing copy generation") {
-    return "You are a senior growth copywriter who creates sharp, reusable marketing copy.";
+    return "你是一位资深增长文案专家，擅长产出可复用的营销文案。";
   }
   if (scenario === "SQL debugging") {
-    return "You are a senior data engineer who diagnoses and fixes SQL issues clearly.";
+    return "你是一位资深数据工程师，擅长清晰定位并修复 SQL 问题。";
   }
-  return "You are an expert AI assistant that turns rough requests into reusable, high-signal outputs.";
+  return "你是一位擅长把粗糙需求整理成高质量可复用结果的 AI 助手。";
 }
 
 function inferPromptTask(scenario) {
   if (scenario === "Podcast interview planning") {
-    return "Turn the source material into a podcast interview outline that is directly usable by a host.";
+    return "把原始素材整理成主持人可以直接使用的播客访谈提纲。";
   }
   if (scenario === "Interview outline generation") {
-    return "Turn the source material into a structured interview outline with a natural flow.";
+    return "把原始素材整理成结构清晰、节奏自然的访谈提纲。";
   }
   if (scenario === "Product PRD writing") {
-    return "Turn the source material into a concise but execution-ready PRD draft.";
+    return "把原始素材整理成简洁但可执行的 PRD 草稿。";
   }
   if (scenario === "Marketing copy generation") {
-    return "Turn the source material into strong copy options tailored to the target use case.";
+    return "把原始素材整理成适合目标场景的高质量文案方案。";
   }
   if (scenario === "SQL debugging") {
-    return "Explain the SQL issue, identify the root cause, and provide a corrected query.";
+    return "解释 SQL 问题、定位根因，并给出修正后的查询。";
   }
-  return "Turn the source material into a clear, reusable output instead of a one-off response.";
+  return "把原始素材整理成清晰、可复用的结果，而不是一次性回答。";
 }
 
 function inferPromptRequirements(scenario) {
   if (scenario === "Podcast interview planning") {
     return [
-      "Keep the structure host-friendly and easy to follow live.",
-      "Include opening, core sections, follow-up questions, and a closing segment.",
-      "Prefer specific and conversation-driving questions over generic filler."
+      "结构要方便主持人现场使用，层次清晰。",
+      "包含开场、核心环节、追问设计和收尾部分。",
+      "优先使用具体、能推动对话深入的问题，避免空泛表达。"
     ];
   }
   if (scenario === "Interview outline generation") {
     return [
-      "Organize questions from warm-up to deep discussion.",
-      "Make transitions between sections feel natural.",
-      "Include follow-up questions where depth is useful."
+      "问题顺序要从热身逐步推进到深入讨论。",
+      "各部分之间过渡自然。",
+      "适当加入能继续深挖的追问。"
     ];
   }
   if (scenario === "Product PRD writing") {
     return [
-      "Write in a concrete and execution-ready way.",
-      "Separate goals, scope, non-goals, and success metrics clearly.",
-      "Avoid vague product jargon."
+      "表达要具体，便于后续执行。",
+      "清楚区分目标、范围、非目标和成功指标。",
+      "避免空泛的产品黑话。"
     ];
   }
   if (scenario === "Marketing copy generation") {
     return [
-      "Give multiple options instead of a single line.",
-      "Keep each option distinct in tone or angle.",
-      "Optimize for clarity and usefulness over hype."
+      "提供多个版本，而不是只给一条。",
+      "每个版本在角度或语气上要有区分。",
+      "优先保证清晰和实用，不要空洞夸张。"
     ];
   }
   if (scenario === "SQL debugging") {
     return [
-      "Show the likely failure point clearly.",
-      "Explain the reasoning before presenting the fix.",
-      "Return corrected SQL when possible."
+      "清楚指出最可能的报错点。",
+      "先解释原因，再给出修正方案。",
+      "能给出修正 SQL 时，直接给出。"
     ];
   }
   return [
-    "Clarify the user goal before answering.",
-    "Keep the response structured and reusable.",
-    "Optimize for clarity, not verbosity."
+    "先确认用户目标，再开始输出。",
+    "保持结构清晰，方便后续复用。",
+    "优先追求清晰，不要堆砌冗长表达。"
   ];
 }
 
@@ -518,37 +615,37 @@ function scoreWorkflowPrompt(item, scenario = "") {
   if (text.length >= 180) {
     score += 10;
   } else {
-    issues.push("Prompt is short and may need more structure.");
+    issues.push("这条 Prompt 偏短，结构可能还不够完整。");
   }
 
-  if (/^# ROLE/m.test(text)) {
+  if (/^# (ROLE|角色)/m.test(text)) {
     score += 8;
   } else {
-    issues.push("Missing ROLE section.");
+    issues.push("缺少“角色”部分。");
   }
 
-  if (/^# TASK/m.test(text)) {
+  if (/^# (TASK|任务)/m.test(text)) {
     score += 8;
   } else {
-    issues.push("Missing TASK section.");
+    issues.push("缺少“任务”部分。");
   }
 
-  if (/^# REQUIREMENTS/m.test(text)) {
+  if (/^# (REQUIREMENTS|要求)/m.test(text)) {
     score += 6;
   } else {
-    issues.push("Missing REQUIREMENTS section.");
+    issues.push("缺少“要求”部分。");
   }
 
-  if (/^# OUTPUT FORMAT/m.test(text)) {
+  if (/^# (OUTPUT FORMAT|输出格式)/m.test(text)) {
     score += 6;
   } else {
-    issues.push("Missing OUTPUT FORMAT section.");
+    issues.push("缺少“输出格式”部分。");
   }
 
   if (Array.isArray(item?.sourceTurnIds) && item.sourceTurnIds.length) {
     score += 6;
   } else {
-    issues.push("No linked source turn.");
+    issues.push("没有关联到原始来源轮次。");
   }
 
   if (scenario === "Podcast interview planning" && /访谈|播客|问题|follow-up|追问/i.test(text)) {
@@ -564,11 +661,69 @@ function scoreWorkflowPrompt(item, scenario = "") {
 }
 
 function enrichWorkflowPrompts(workflowPrompts = [], scenario = "") {
-  return workflowPrompts.map((item, index) => ({
+  const deduped = dedupeWorkflowPrompts(workflowPrompts).map((item, index) => ({
     ...item,
     order: index + 1,
     quality: scoreWorkflowPrompt(item, scenario)
   }));
+
+  return finalizeWorkflowPromptTitles(deduped, scenario);
+}
+
+function dedupeWorkflowPrompts(items = []) {
+  const result = [];
+
+  items.forEach((item) => {
+    const prompt = String(item?.prompt || "").trim();
+    if (!prompt) {
+      return;
+    }
+
+    const duplicate = result.find((existing) => isWorkflowPromptDuplicate(existing.prompt, prompt));
+    if (duplicate) {
+      duplicate.sourceTurnIds = dedupe([
+        ...(duplicate.sourceTurnIds || []),
+        ...(item.sourceTurnIds || [])
+      ]);
+      return;
+    }
+
+    result.push({
+      ...item,
+      prompt
+    });
+  });
+
+  return result;
+}
+
+function finalizeWorkflowPromptTitles(items = [], scenario = "") {
+  const usedTitles = new Map();
+  return items.map((item, index) => {
+    const baseTitle = deriveWorkflowPromptLabel(item.prompt || item.title || "", scenario)
+      || item.title
+      || `步骤 ${index + 1}`;
+    const count = usedTitles.get(baseTitle) || 0;
+    usedTitles.set(baseTitle, count + 1);
+    return {
+      ...item,
+      title: count === 0 ? baseTitle : `${baseTitle}（补充 ${count + 1}）`
+    };
+  });
+}
+
+function isWorkflowPromptDuplicate(left, right) {
+  const leftTokens = tokenizeForMatch(left);
+  const rightTokens = tokenizeForMatch(right);
+  if (!leftTokens.length || !rightTokens.length) {
+    return false;
+  }
+
+  const leftSet = new Set(leftTokens);
+  const rightSet = new Set(rightTokens);
+  const overlap = leftTokens.filter((token) => rightSet.has(token)).length;
+  const ratio = overlap / Math.max(leftSet.size, rightSet.size);
+  return ratio >= 0.72;
 }
 
 export function buildSkillStructureFromWorkflowPrompts({
@@ -655,9 +810,9 @@ function tokenizeForMatch(text) {
 
 function inferSuccessCriteria(outputFormat) {
   return [
-    "The output follows the requested structure.",
-    "The answer reflects the original user intent.",
-    `The result is usable as a ${outputFormat.toLowerCase()}.`
+    "输出遵循约定结构。",
+    "输出忠实反映原始目标和语境。",
+    `结果可以直接作为${outputFormat}使用。`
   ];
 }
 
@@ -730,42 +885,64 @@ function summarizeTurnsForDraft(turns = []) {
 
 function buildPromptTemplate(selectedText, inputs, workflowPrompts = []) {
   const inputSection = inputs.length
-    ? inputs.map((input) => `- ${input.label}: {{${input.key}}}`).join("\n")
-    : "- topic: {{topic}}";
+    ? inputs.map((input) => `- ${input.label}：{{${input.key}}}`).join("\n")
+    : "- 主题：{{topic}}";
 
   if (workflowPrompts.length) {
     return [
-      "# IDENTITY and PURPOSE",
-      "Use the following workflow to complete the task in a reusable, structured way.",
+      "# SOP 概览",
+      "按照下面的标准操作流程执行任务，确保输出可直接复用，而不是一次性回答。",
       "",
-      "# INPUTS",
+      "# 前置输入",
       inputSection,
       "",
-      "# STEPS",
+      "# 前置条件",
+      "- 先确认输入信息完整，尤其是核心主题、对象和输出要求。",
+      "- 如果上下文不完整，先补齐关键约束再执行。",
+      "",
+      "# 标准操作步骤",
       workflowPrompts
-        .map((item, index) => `## Step ${index + 1}: ${item.title}\n${item.prompt}`)
+        .map((item, index) => `## 第 ${index + 1} 步：${item.title}\n${compactWorkflowPromptForRunbook(item, index, workflowPrompts[index - 1])}`)
         .join("\n\n"),
       "",
-      "# OUTPUT INSTRUCTIONS",
-      "Return a structured result that follows the requested format and is ready to use without extra rewriting."
+      "# 失败回退",
+      "- 如果某一步信息不足，先指出缺失项，再基于已有信息给出可执行的临时版本。",
+      "- 如果原始素材冲突，优先保留用户最新、最明确的要求。",
+      "",
+      "# 最终产出",
+      "只输出最终需要交付的结构化结果，不要重复解释整个流程。",
+      "",
+      "# 最终检查",
+      "- 确保输出结构完整",
+      "- 确保内容可直接使用",
+      "- 确保不要遗漏关键约束"
     ].join("\n");
   }
 
   if (!selectedText) {
     return [
-      "# IDENTITY and PURPOSE",
-      "Apply this skill to the provided input and return a clear, structured result.",
+      "# SOP 概览",
+      "根据输入执行这条技能，并返回结构清晰、可直接使用的结果。",
       "",
-      "# INPUTS",
+      "# 前置输入",
       inputSection,
       "",
-      "# STEPS",
-      "## Step 1\nUnderstand the task and clarify the goal.",
+      "# 前置条件",
+      "- 确认输入内容足够支持生成结果。",
       "",
-      "## Step 2\nApply the skill method to the provided input.",
+      "# 标准操作步骤",
+      "## 第 1 步\n理解任务并确认目标。",
       "",
-      "# OUTPUT INSTRUCTIONS",
-      "Return a clear, structured response."
+      "## 第 2 步\n执行技能方法并组织结果。",
+      "",
+      "# 失败回退",
+      "- 如果输入不完整，先指出缺失信息，再输出临时版本。",
+      "",
+      "# 最终产出",
+      "输出清晰、结构化、可直接使用的结果。",
+      "",
+      "# 最终检查",
+      "- 确保结果可直接使用。"
     ].join("\n");
   }
 
@@ -776,17 +953,26 @@ function buildPromptTemplate(selectedText, inputs, workflowPrompts = []) {
   });
 
   return [
-    "# IDENTITY and PURPOSE",
-    "Apply the following reusable method to the provided input.",
+    "# SOP 概览",
+    "按照以下方法处理输入，并输出结构化结果。",
     "",
-    "# INPUTS",
+    "# 前置输入",
     inputSection,
     "",
-    "# TASK",
+    "# 前置条件",
+    "- 先确认输入信息完整。",
+    "",
+    "# 任务定义",
     template,
     "",
-    "# OUTPUT INSTRUCTIONS",
-    "Return the result in a clear, structured format."
+    "# 失败回退",
+    "- 如果信息不完整，先指出缺失项，再给出当前可执行版本。",
+    "",
+    "# 最终产出",
+    "请直接返回结构清晰、可以交付的结果。",
+    "",
+    "# 最终检查",
+    "- 确保结果结构完整。"
   ].join("\n");
 }
 
