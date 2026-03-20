@@ -212,4 +212,4 @@ Start here:
 
 ## License
 
-- [MIT License](./LICENSE)
+- [GNU GPL v3](./LICENSE)

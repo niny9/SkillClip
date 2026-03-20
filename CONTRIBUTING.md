@@ -121,6 +121,6 @@ node --check src/lib/compiler.js
 
 ## License
 
-贡献代码默认按本仓库的 MIT License 发布：
+贡献代码默认按本仓库的 GNU GPL v3 发布：
 
 - [LICENSE](/Users/niny/Documents/GitHub/SkillClip/LICENSE)

@@ -193,4 +193,4 @@ SkillClip 管理的核心资产不是“句子”，而是：
 
 ## License
 
-- [MIT License](./LICENSE)
+- [GNU GPL v3](./LICENSE)
