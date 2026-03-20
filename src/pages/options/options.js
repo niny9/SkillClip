@@ -10,7 +10,10 @@ const SUPPORTED_HOSTS = [
   "gemini.google.com",
   "chat.deepseek.com",
   "perplexity.ai",
-  "www.perplexity.ai"
+  "www.perplexity.ai",
+  "kimi.moonshot.cn",
+  "www.kimi.com",
+  "kimi.com"
 ];
 
 async function load() {
@@ -23,6 +26,7 @@ async function load() {
   const settings = settingsResponse.result;
 
   updateCount("conversations", state.conversations.filter((item) => !item.archivedAt).length);
+  updateCount("supported_tabs", await countSupportedTabs());
   updateCount("in_progress", state.drafts.filter((item) => item.status === "preview" || item.status === "draft").length);
   updateCount("skills", state.skills.filter((item) => item.status !== "archived").length);
   updateCount("variants", state.variants.length);
@@ -71,7 +75,7 @@ function renderAssetBrowser(state) {
   ];
 
   node.innerHTML = [
-    renderBrowserList("Inbox / 待整理素材", inboxItems, (item) => {
+    renderBrowserList("Inbox / 待整理素材", "inbox", inboxItems, (item) => {
       const title = item.sourceTitle || item.selectedText || item.sourcePlatform || "Untitled capture";
       const subtitle = `${item.sourcePlatform || "unknown"} · ${item.captureMode || "capture"}`;
       const preview = item.selectedText || item.turns?.[0]?.text || "";
@@ -81,23 +85,25 @@ function renderAssetBrowser(state) {
           <p class="muted">${escapeHtml(subtitle)}</p>
           <p>${escapeHtml(preview.slice(0, 180) || "No preview text yet.")}</p>
           <div class="action-row">
+            <button type="button" data-action="archive-asset" data-kind="conversation" data-id="${item.id}">Archive / 归档</button>
             <button type="button" data-action="delete-asset" data-kind="conversation" data-id="${item.id}">Delete / 删除</button>
           </div>
         </article>
       `;
     }),
-    renderBrowserList("In Progress / 处理中技能", inProgressItems, (item) => `
+    renderBrowserList("Pending Skills / 待确认技能", "pending", inProgressItems, (item) => `
       <article class="browser-item clickable-card" data-asset-kind="draft" data-asset-id="${item.id}">
         <strong>${escapeHtml(item.name || "Untitled skill in progress")}</strong>
         <p class="muted">${escapeHtml(item.uiStage === "preview" ? "Preview / 系统刚生成，待你确认" : "Draft / 你已确认，可继续编辑")}</p>
         <p class="muted">${escapeHtml(item.useWhen || item.scenario || "No use-when summary yet.")}</p>
         <p>${escapeHtml((item.outputFormat || item.goal || "").slice(0, 180) || "No output format summary yet.")}</p>
         <div class="action-row">
+          <button type="button" data-action="archive-asset" data-kind="draft" data-id="${item.id}">Archive / 归档</button>
           <button type="button" data-action="delete-asset" data-kind="draft" data-id="${item.id}">Delete / 删除</button>
         </div>
       </article>
     `),
-    renderBrowserList("Skills / 正式技能", skillItems, (item) => {
+    renderBrowserList("Ready Skills / 可复用技能", "ready", skillItems, (item) => {
       const variantCount = variantItems.filter((variant) => variant.baseSkillId === item.id).length;
       return `
         <article class="browser-item clickable-card" data-asset-kind="skill" data-asset-id="${item.id}">
@@ -106,12 +112,13 @@ function renderAssetBrowser(state) {
           <p>${escapeHtml((item.successCriteria || item.outputFormat || "").slice(0, 180) || "No success criteria yet.")}</p>
           <p class="muted">Variants / 变体: ${variantCount}</p>
           <div class="action-row">
+            <button type="button" data-action="archive-asset" data-kind="skill" data-id="${item.id}">Archive / 归档</button>
             <button type="button" data-action="delete-asset" data-kind="skill" data-id="${item.id}">Delete / 删除</button>
           </div>
         </article>
       `;
     }),
-    renderBrowserList("Variants / 技能变体", variantItems, (item) => `
+    renderBrowserList("Variants / 同场景优化版本", "variant", variantItems, (item) => `
       <article class="browser-item clickable-card" data-asset-kind="variant" data-asset-id="${item.id}">
         <strong>${escapeHtml(item.name || "Untitled variant")}</strong>
         <p class="muted">${escapeHtml(item.baseSkillId ? `Base / 基础技能: ${item.baseSkillId}` : "No base skill linked.")}</p>
@@ -121,11 +128,12 @@ function renderAssetBrowser(state) {
         </div>
       </article>
     `),
-    renderBrowserList("Archived / 已归档", archivedItems, (item) => `
+    renderBrowserList("Archived / 已归档", "archived", archivedItems, (item) => `
       <article class="browser-item clickable-card" data-asset-kind="${escapeHtml(item.kind || "conversation")}" data-asset-id="${item.id}">
         <strong>${escapeHtml(item.name || item.title || "Archived item")}</strong>
         <p class="muted">${escapeHtml(item.kind || "asset")}</p>
         <div class="action-row">
+          <button type="button" data-action="restore-asset" data-kind="${escapeHtml(item.kind || "conversation")}" data-id="${item.id}">Restore / 恢复</button>
           <button type="button" data-action="delete-asset" data-kind="${escapeHtml(item.kind || "conversation")}" data-id="${item.id}">Delete / 删除</button>
         </div>
       </article>
@@ -133,13 +141,13 @@ function renderAssetBrowser(state) {
   ].join("");
 }
 
-function renderBrowserList(title, items, renderer) {
+function renderBrowserList(title, stage, items, renderer) {
   const content = items.length
     ? items.map((item) => renderer(item)).join("")
     : `<p class="muted">Nothing here yet.</p>`;
 
   return `
-    <section class="browser-section">
+    <section class="browser-section browser-section-${stage}">
       <div class="status-line">
         <span>${title}</span>
         <strong>${items.length}</strong>
@@ -194,17 +202,51 @@ async function renderActiveTabStatus() {
   const tabs = await chrome.tabs.query({ currentWindow: true });
   const tab = pickBestSupportedTab(tabs) || pickBestExternalTab(tabs);
   const activeTabNode = document.querySelector("[data-active-tab]");
-  const platformNode = document.querySelector("[data-platform-status]");
 
   if (!tab?.url) {
-    activeTabNode.textContent = "No page found";
-    platformNode.textContent = "Unknown";
+    activeTabNode.textContent = "No supported page";
     return;
   }
 
   const url = new URL(tab.url);
-  activeTabNode.textContent = url.hostname;
-  platformNode.textContent = SUPPORTED_HOSTS.includes(url.hostname) ? "Supported" : "Unsupported";
+  activeTabNode.textContent = hostnameToPlatformLabel(url.hostname);
+}
+
+async function countSupportedTabs() {
+  const tabs = await chrome.tabs.query({ currentWindow: true });
+  return tabs.filter((tab) => {
+    if (!tab.url) {
+      return false;
+    }
+    try {
+      const url = new URL(tab.url);
+      return SUPPORTED_HOSTS.includes(url.hostname);
+    } catch (error) {
+      return false;
+    }
+  }).length;
+}
+
+function hostnameToPlatformLabel(hostname) {
+  if (hostname.includes("chatgpt") || hostname.includes("openai")) {
+    return "ChatGPT";
+  }
+  if (hostname.includes("claude")) {
+    return "Claude";
+  }
+  if (hostname.includes("gemini")) {
+    return "Gemini";
+  }
+  if (hostname.includes("deepseek")) {
+    return "DeepSeek";
+  }
+  if (hostname.includes("perplexity")) {
+    return "Perplexity";
+  }
+  if (hostname.includes("moonshot") || hostname.includes("kimi")) {
+    return "Kimi";
+  }
+  return hostname;
 }
 
 function pickBestExternalTab(tabs) {
@@ -253,7 +295,9 @@ async function withActiveTab(callback) {
 
 function setFeedback(message) {
   const node = document.querySelector("[data-action-feedback]");
-  node.textContent = message;
+  if (node) {
+    node.textContent = message;
+  }
 }
 
 function setSettingsFeedback(message) {
@@ -331,6 +375,60 @@ async function deleteAsset(kind, id) {
   });
   await load();
   setAssetFeedback(`Deleted ${kind} / 已删除 ${kind}。`);
+}
+
+async function archiveAsset(kind, id) {
+  const typeMap = {
+    conversation: MESSAGE_TYPES.ARCHIVE_CONVERSATION,
+    draft: MESSAGE_TYPES.ARCHIVE_DRAFT,
+    skill: MESSAGE_TYPES.ARCHIVE_SKILL
+  };
+  const payloadKeyMap = {
+    conversation: "conversationId",
+    draft: "draftId",
+    skill: "skillId"
+  };
+
+  const type = typeMap[kind];
+  const payloadKey = payloadKeyMap[kind];
+  if (!type || !payloadKey) {
+    setAssetFeedback("This asset type cannot be archived.");
+    return;
+  }
+
+  await chrome.runtime.sendMessage({
+    type,
+    payload: { [payloadKey]: id }
+  });
+  await load();
+  setAssetFeedback(`Archived ${kind} / 已归档 ${kind}。`);
+}
+
+async function restoreAsset(kind, id) {
+  const typeMap = {
+    conversation: MESSAGE_TYPES.RESTORE_CONVERSATION,
+    draft: MESSAGE_TYPES.RESTORE_DRAFT,
+    skill: MESSAGE_TYPES.RESTORE_SKILL
+  };
+  const payloadKeyMap = {
+    conversation: "conversationId",
+    draft: "draftId",
+    skill: "skillId"
+  };
+
+  const type = typeMap[kind];
+  const payloadKey = payloadKeyMap[kind];
+  if (!type || !payloadKey) {
+    setAssetFeedback("This asset type cannot be restored.");
+    return;
+  }
+
+  await chrome.runtime.sendMessage({
+    type,
+    payload: { [payloadKey]: id }
+  });
+  await load();
+  setAssetFeedback(`Restored ${kind} / 已恢复 ${kind}。`);
 }
 
 function collectSettingsFromForm() {
@@ -444,6 +542,16 @@ document.addEventListener("click", async (event) => {
 
   if (action === "delete-asset") {
     await deleteAsset(target.dataset.kind, target.dataset.id);
+    return;
+  }
+
+  if (action === "archive-asset") {
+    await archiveAsset(target.dataset.kind, target.dataset.id);
+    return;
+  }
+
+  if (action === "restore-asset") {
+    await restoreAsset(target.dataset.kind, target.dataset.id);
     return;
   }
 

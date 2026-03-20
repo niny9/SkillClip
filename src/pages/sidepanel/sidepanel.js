@@ -11,19 +11,12 @@ async function load() {
   const activeConversations = state.conversations.filter((item) => !item.archivedAt);
   const previewDrafts = state.drafts.filter((item) => item.status === "preview").map((item) => ({ ...item, uiStage: "preview" }));
   const activeDrafts = state.drafts.filter((item) => item.status === "draft").map((item) => ({ ...item, uiStage: "draft" }));
-  const inProgressItems = [...previewDrafts, ...activeDrafts];
   const activeSkills = state.skills.filter((item) => item.status !== "archived");
-  const archivedItems = [
-    ...state.conversations.filter((item) => item.archivedAt).map((item) => ({ ...item, archiveKind: "conversation" })),
-    ...state.drafts.filter((item) => item.status === "archived").map((item) => ({ ...item, archiveKind: "draft" })),
-    ...state.skills.filter((item) => item.status === "archived").map((item) => ({ ...item, archiveKind: "skill" }))
-  ];
 
-  renderList("[data-inbox]", activeConversations, renderConversation);
-  renderList("[data-in-progress]", inProgressItems, renderInProgressItem);
+  renderList("[data-queue-raw]", activeConversations, renderConversation);
+  renderList("[data-queue-pending]", [...previewDrafts, ...activeDrafts], renderInProgressItem);
   renderSkills("[data-skills]", activeSkills, state.variants);
   renderVariants("[data-variants]", state.variants, state.skills);
-  renderList("[data-archived]", archivedItems, renderArchivedItem);
 }
 
 function setFeedback(message) {
@@ -98,15 +91,15 @@ function renderConversation(item) {
       && (draft.sourceConversationIds || []).includes(item.id)
   ));
   return `
-    <article class="list-card">
+    <article class="list-card queue-card queue-card-raw">
       <strong>${escapeHtml(item.selectedText || item.sourceTitle || "Captured conversation")}</strong>
+      <span class="queue-badge">Raw capture / 原始素材</span>
       <span>Source / 来源: ${escapeHtml(item.sourcePlatform || "other")} · Mode / 方式: ${escapeHtml(item.captureMode)}</span>
       <div class="meta-block">
         <small>${hasAutoPreview ? "A preview already exists for this source. / 这条素材已经生成过预览。" : "Next step / 下一步: compile this source into a preview."}</small>
       </div>
       <div class="action-row">
         <button type="button" data-action="compile-conversation" data-id="${item.id}">Compile to Preview / 编译为预览</button>
-        <button type="button" data-action="archive-conversation" data-id="${item.id}">Archive</button>
         <button type="button" data-action="delete-conversation" data-id="${item.id}">Delete / 删除</button>
       </div>
     </article>
@@ -121,15 +114,15 @@ function renderInProgressItem(item) {
     ? `<button type="button" data-action="approve-preview" data-id="${item.id}">Save as Draft / 保存为草稿</button>`
     : `<button type="button" data-action="promote-draft" data-id="${item.id}">Promote to Skill / 升级成技能</button>`;
   return `
-    <article class="list-card clickable-card" data-detail-kind="draft" data-detail-id="${item.id}">
+    <article class="list-card clickable-card queue-card queue-card-pending" data-detail-kind="draft" data-detail-id="${item.id}">
       <strong>${escapeHtml(item.name)}</strong>
+      <span class="queue-badge">${escapeHtml(item.uiStage === "preview" ? "Preview / 待确认" : "Draft / 可编辑")}</span>
       <span>${escapeHtml(stageLine)} · ${escapeHtml(item.scenario || "Skill in progress")}</span>
       <div class="meta-block">
         <small>${escapeHtml(item.useWhen || "Review and refine this skill before making it reusable.")}</small>
       </div>
       <div class="action-row">
         ${primaryButton}
-        <button type="button" data-action="archive-draft" data-id="${item.id}">${item.uiStage === "preview" ? "Dismiss / 归档" : "Archive / 归档"}</button>
         <button type="button" data-action="delete-draft" data-id="${item.id}">Delete / 删除</button>
       </div>
     </article>
@@ -147,7 +140,6 @@ function renderSkill(item, variantsForSkill = []) {
       </div>
       <div class="action-row">
         <button type="button" data-action="create-variant" data-id="${item.id}">Create Alternative / 新建优化版</button>
-        <button type="button" data-action="archive-skill" data-id="${item.id}">Archive</button>
         <button type="button" data-action="delete-skill" data-id="${item.id}">Delete / 删除</button>
       </div>
     </article>
@@ -164,32 +156,6 @@ function renderVariant(item, baseSkill) {
       </div>
       <div class="action-row">
         <button type="button" data-action="delete-variant" data-id="${item.id}">Delete / 删除</button>
-      </div>
-    </article>
-  `;
-}
-
-function renderArchivedItem(item) {
-  const kindMap = {
-    conversation: "Raw capture / 原始素材",
-    draft: "Draft / 技能草稿",
-    skill: "Skill / 正式技能"
-  };
-
-  const restoreAction = item.archiveKind === "conversation"
-    ? "restore-conversation"
-    : item.archiveKind === "draft"
-      ? "restore-draft"
-      : "restore-skill";
-  const restoreId = item.id;
-
-  return `
-    <article class="list-card">
-      <strong>${escapeHtml(item.name || item.selectedText || item.sourceTitle || "Archived item")}</strong>
-      <span>Archived / 已归档 · ${escapeHtml(kindMap[item.archiveKind] || item.archiveKind || "item")}</span>
-      <div class="action-row">
-        <button type="button" data-action="${restoreAction}" data-id="${restoreId}">Restore / 恢复</button>
-        <button type="button" data-action="delete-${item.archiveKind}" data-id="${restoreId}">Delete / 删除</button>
       </div>
     </article>
   `;
@@ -486,11 +452,6 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
-  if (action === "archive-conversation" && id) {
-    await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.ARCHIVE_CONVERSATION, payload: { conversationId: id } });
-    return;
-  }
-
   if (action === "delete-conversation" && id) {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.DELETE_CONVERSATION, payload: { conversationId: id } });
     setFeedback("Conversation deleted.");
@@ -504,20 +465,10 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
-  if (action === "archive-draft" && id) {
-    await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.ARCHIVE_DRAFT, payload: { draftId: id } });
-    return;
-  }
-
   if (action === "delete-draft" && id) {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.DELETE_DRAFT, payload: { draftId: id } });
     setFeedback("Draft deleted.");
     hideDetailPanel();
-    return;
-  }
-
-  if (action === "archive-skill" && id) {
-    await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.ARCHIVE_SKILL, payload: { skillId: id } });
     return;
   }
 
@@ -532,24 +483,6 @@ document.addEventListener("click", async (event) => {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.DELETE_VARIANT, payload: { variantId: id } });
     setFeedback("Variant deleted.");
     hideDetailPanel();
-    return;
-  }
-
-  if (action === "restore-conversation" && id) {
-    await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.RESTORE_CONVERSATION, payload: { conversationId: id } });
-    setFeedback("Conversation restored to Inbox.");
-    return;
-  }
-
-  if (action === "restore-draft" && id) {
-    await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.RESTORE_DRAFT, payload: { draftId: id } });
-    setFeedback("Draft restored.");
-    return;
-  }
-
-  if (action === "restore-skill" && id) {
-    await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.RESTORE_SKILL, payload: { skillId: id } });
-    setFeedback("Skill restored.");
     return;
   }
 

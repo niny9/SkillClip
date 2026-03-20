@@ -25,6 +25,7 @@
     GEMINI: "gemini",
     DEEPSEEK: "deepseek",
     PERPLEXITY: "perplexity",
+    KIMI: "kimi",
     OTHER: "other"
   };
 
@@ -72,10 +73,27 @@
       inputSelectors: ["div[contenteditable='true']", "textarea"],
       titleSelectors: ["main h1", "title"],
       modelSelectors: ["button[aria-haspopup='menu']", "[class*='model']"],
-      messageSelectors: ["message-content", "[data-test-id='conversation-turn']", "article"],
+      messageSelectors: [
+        "message-content",
+        "[data-test-id='conversation-turn']",
+        "[data-message-id]",
+        "[role='listitem']",
+        "main article"
+      ],
       roleFromNode: (node) => {
+        const ariaLabel = node.getAttribute("aria-label") || "";
+        const dataRole = node.getAttribute("data-role") || "";
         const text = node.textContent || "";
-        return /gemini/i.test(text.slice(0, 30)) ? "assistant" : "user";
+        if (/user|you/i.test(ariaLabel) || /user/i.test(dataRole)) {
+          return "user";
+        }
+        if (/gemini|model|assistant/i.test(ariaLabel) || /assistant/i.test(dataRole)) {
+          return "assistant";
+        }
+        if (/^you\b/i.test(text.trim())) {
+          return "user";
+        }
+        return /gemini/i.test(text.slice(0, 60)) ? "assistant" : guessRoleFromText(text);
       },
       textFromNode: (node) => readRichText(node)
     },
@@ -108,6 +126,26 @@
           return "assistant";
         }
         return guessRoleFromText(node.textContent || "");
+      },
+      textFromNode: (node) => readRichText(node)
+    },
+    {
+      id: PLATFORMS.KIMI,
+      matches: (hostname) => hostname === "kimi.moonshot.cn" || hostname === "www.kimi.com" || hostname === "kimi.com",
+      inputSelectors: ["textarea", "div[contenteditable='true']", "div[role='textbox']"],
+      titleSelectors: ["main h1", "title"],
+      modelSelectors: ["button[aria-haspopup='menu']", "[class*='model']", "[class*='Model']"],
+      messageSelectors: ["main article", "[data-message-id]", "[role='listitem']", "[class*='message']"],
+      roleFromNode: (node) => {
+        const ariaLabel = node.getAttribute("aria-label") || "";
+        const text = node.textContent || "";
+        if (/user|you/i.test(ariaLabel) || /^you\b/i.test(text.trim())) {
+          return "user";
+        }
+        if (/kimi|assistant|moonshot/i.test(ariaLabel) || /kimi/i.test(text.slice(0, 60))) {
+          return "assistant";
+        }
+        return guessRoleFromText(text);
       },
       textFromNode: (node) => readRichText(node)
     }
@@ -272,9 +310,9 @@
         if (!payload.turns.length && !payload.selectedText) {
           showToast("No flow found on this page yet");
         } else if (payload.fallbackFlow) {
-          showToast("Fallback flow saved and compiled into preview");
+          showToast("Whole flow saved to queue as fallback content");
         } else {
-          showToast(response?.result?.preview ? "Flow saved and compiled into preview" : "Whole flow saved");
+          showToast(response?.result?.preview ? "Whole flow saved and added to pending skills" : "Whole flow saved to queue");
         }
       }
 
@@ -500,7 +538,41 @@
       });
     });
 
-    return nodes.filter((node) => readRichText(node).trim().length > 0);
+    const filtered = nodes.filter((node) => readRichText(node).trim().length > 0 && !isInsideSkillclipUi(node));
+    if (filtered.length >= 2) {
+      return filtered;
+    }
+
+    const fallbackNodes = collectFallbackMessageNodes();
+    fallbackNodes.forEach((node) => {
+      if (!seen.has(node)) {
+        seen.add(node);
+        filtered.push(node);
+      }
+    });
+
+    return filtered;
+  }
+
+  function collectFallbackMessageNodes() {
+    const main = document.querySelector("main") || document.body;
+    const candidates = Array.from(main.querySelectorAll("article, section, div, p"))
+      .filter((node) => node instanceof HTMLElement)
+      .filter((node) => isVisible(node) && !isInsideSkillclipUi(node))
+      .filter((node) => {
+        const text = readRichText(node);
+        return text.length >= 40 && text.length <= 1600;
+      })
+      .filter((node) => {
+        const childTextLength = Array.from(node.children).reduce((sum, child) => sum + readRichText(child).length, 0);
+        return childTextLength < readRichText(node).length * 0.85;
+      });
+
+    return candidates.slice(-12);
+  }
+
+  function isInsideSkillclipUi(node) {
+    return Boolean(node.closest(".skillclip-panel, .skillclip-toast"));
   }
 
   function collapseDuplicateTurns(turns) {

@@ -11,16 +11,15 @@
       <section>
         <p class="eyebrow">Workspace</p>
         <h1>Workspace / 工作台</h1>
-        <p class="lede">保存 Prompt 或 Whole Flow 后，会先进入 Inbox，并默认自动生成 Compile Preview。你审核后保存成 Draft，再提升成正式 Skill。</p>
+        <p class="lede">保存 Prompt 或 Whole Flow 后，会先进入待整理队列。你确认后，它才会变成可复用技能；优化版用于同场景下的第二版、第三版。</p>
 
         <section class="card">
           <h2>Flow / 当前流程</h2>
           <div class="checklist">
-            <p>1. Save Prompt 或 Save Whole Flow：先保存原始素材。</p>
-            <p>2. 系统会自动生成一个处理中技能。刚生成时叫 Preview，你确认后就变成 Draft。</p>
-            <p>3. Draft 再点 Promote to Skill / 升级成正式技能，就进入可复用技能区。</p>
-            <p>4. Variant / 优化版本 是你手动为同一场景分叉出的另一版，不是系统自动猜出来的。</p>
-            <p>5. 如果误归档，可在 Archived / 已归档 里恢复。</p>
+            <p>1. Save Prompt 或 Save Whole Flow：先进入待整理与处理中。</p>
+            <p>2. 你确认后，点 Promote to Skill / 升级成正式技能，进入可复用技能。</p>
+            <p>3. 如果同一场景要做第二版、第三版，就从正式技能创建优化版本。</p>
+            <p>4. Archive 只是从主工作台隐藏，Delete 才是永久删除。</p>
           </div>
         </section>
 
@@ -42,14 +41,18 @@
         </section>
 
         <section class="card">
-          <h2>Inbox / 待整理素材</h2>
-          <div data-inbox class="stack"></div>
-        </section>
-
-        <section class="card">
-          <h2>Skills In Progress / 处理中技能</h2>
-          <p class="muted">Preview 是系统刚生成的结果，Draft 是你确认后可继续编辑的工作版本。</p>
-          <div data-in-progress class="stack"></div>
+          <h2>Queue / 待整理与处理中</h2>
+          <p class="muted">这里既有原始素材，也有系统刚整理好的待确认技能。</p>
+          <div class="queue-grid">
+            <section class="queue-column">
+              <h3>Raw Captures / 原始素材</h3>
+              <div data-queue-raw class="stack"></div>
+            </section>
+            <section class="queue-column">
+              <h3>Pending Skills / 待确认技能</h3>
+              <div data-queue-pending class="stack"></div>
+            </section>
+          </div>
         </section>
 
         <section class="card">
@@ -63,10 +66,6 @@
           <div data-variants class="stack"></div>
         </section>
 
-        <section class="card">
-          <h2>Archived / 已归档</h2>
-          <div data-archived class="stack"></div>
-        </section>
       </section>
 
       <aside class="card detail-panel">

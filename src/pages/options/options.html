@@ -29,12 +29,12 @@
           <h2>Current Status</h2>
           <div class="stack compact-stack">
             <div class="status-line">
-              <span>Target page / 当前目标页</span>
+              <span>Detected AI page / 当前识别平台</span>
               <strong data-active-tab>Checking...</strong>
             </div>
             <div class="status-line">
-              <span>Platform support / 平台支持</span>
-              <strong data-platform-status>Checking...</strong>
+              <span>Supported AI tabs / 已打开支持页面</span>
+              <strong data-count="supported_tabs">0</strong>
             </div>
             <div class="status-line">
               <span>Inbox raw captures / 待整理素材</span>
@@ -56,21 +56,6 @@
               <span>Archived items / 已归档</span>
               <strong data-count="archived">0</strong>
             </div>
-          </div>
-        </article>
-
-        <article class="card">
-          <h2>Quick Test</h2>
-          <div class="stack compact-stack">
-            <button type="button" data-action="open-actionbar">Open Action Bar On Active Tab / 在 AI 页面打开操作条</button>
-            <button type="button" data-action="open-palette">Open Skill Palette On Active Tab / 在 AI 页面打开技能面板</button>
-          </div>
-          <p class="muted" data-action-feedback>
-            Start on a supported AI page, then trigger the in-page UI from here.
-          </p>
-          <div class="checklist">
-            <p>`Action Bar` 用来保存 prompt、保存 whole flow、语音输入、编译为预览。</p>
-            <p>`Skill Palette` 用来把正式技能重新插入当前 AI 输入框，不是用来新建技能。</p>
           </div>
         </article>
       </section>
@@ -100,9 +85,40 @@
       </section>
 
       <section class="card">
+        <h2>Local Assets / 本地资产</h2>
+        <p class="muted">
+          Browse your saved items by stage instead of reading raw JSON. Use JSON only when you need backup or debugging.
+        </p>
+        <div class="action-row">
+          <button type="button" data-action="refresh-state">Refresh Snapshot</button>
+          <button type="button" data-action="show-full-json">Show Full Snapshot / 显示全部快照</button>
+          <button type="button" data-action="copy-json">Copy JSON</button>
+          <button type="button" data-action="download-json">Download JSON</button>
+        </div>
+        <div class="asset-browser" data-asset-browser></div>
+        <p class="muted" data-asset-feedback>Click an asset card to inspect only that item's JSON here.</p>
+        <details class="raw-json-wrap">
+          <summary>Raw JSON / 原始数据</summary>
+          <textarea data-json-output class="code-area" spellcheck="false"></textarea>
+        </details>
+      </section>
+
+      <section class="card">
+        <h2>Deployment Path</h2>
+        <div class="checklist">
+          <p>1. Add final icons and screenshots.</p>
+          <p>2. Publish a public privacy policy page.</p>
+          <p>3. Test each supported AI site in Chrome.</p>
+          <p>4. Zip the extension root for release packaging.</p>
+          <p>5. Submit to Chrome Web Store with the privacy disclosures.</p>
+        </div>
+      </section>
+
+      <section class="card">
         <h2>Validation Mode / 校验模式</h2>
         <div class="checklist">
-          <p>Choose how SkillClip judges whether an extracted skill is reasonable.</p>
+          <p>Archive means hide from the main workspace but keep it locally. Delete means remove it permanently.</p>
+          <p>Validation runs when a pending item is generated, edited, and promoted into a reusable skill.</p>
         </div>
         <label class="field-label">
           <span>Mode / 模式</span>
@@ -148,38 +164,8 @@
           <button type="button" data-action="save-settings">Save Validation Settings / 保存校验设置</button>
         </div>
         <p class="muted" data-settings-feedback>
-          Validation runs during preview generation, draft editing, and promotion to formal skill.
+          Local mode is simplest. API mode adds an extra AI review step using your own model settings.
         </p>
-      </section>
-
-      <section class="card">
-        <h2>Local Assets / 本地资产</h2>
-        <p class="muted">
-          Browse your saved items by stage instead of reading raw JSON. Use JSON only when you need backup or debugging.
-        </p>
-        <div class="action-row">
-          <button type="button" data-action="refresh-state">Refresh Snapshot</button>
-          <button type="button" data-action="show-full-json">Show Full Snapshot / 显示全部快照</button>
-          <button type="button" data-action="copy-json">Copy JSON</button>
-          <button type="button" data-action="download-json">Download JSON</button>
-        </div>
-        <div class="asset-browser" data-asset-browser></div>
-        <p class="muted" data-asset-feedback>Click an asset card to inspect only that item's JSON here.</p>
-        <details class="raw-json-wrap">
-          <summary>Raw JSON / 原始数据</summary>
-          <textarea data-json-output class="code-area" spellcheck="false"></textarea>
-        </details>
-      </section>
-
-      <section class="card">
-        <h2>Deployment Path</h2>
-        <div class="checklist">
-          <p>1. Add final icons and screenshots.</p>
-          <p>2. Publish a public privacy policy page.</p>
-          <p>3. Test each supported AI site in Chrome.</p>
-          <p>4. Zip the extension root for release packaging.</p>
-          <p>5. Submit to Chrome Web Store with the privacy disclosures.</p>
-        </div>
       </section>
     </main>
     <script type="module" src="./options.js"></script>
