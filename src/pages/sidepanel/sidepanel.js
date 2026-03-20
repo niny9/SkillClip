@@ -165,6 +165,7 @@ function showDetailPanel(item, kind) {
   const form = document.querySelector("[data-detail-form]");
   const empty = document.querySelector("[data-detail-empty]");
   const title = document.querySelector("[data-detail-title]");
+  const note = document.querySelector("[data-detail-note]");
   if (!form || !empty) {
     return;
   }
@@ -178,6 +179,14 @@ function showDetailPanel(item, kind) {
 
   empty.hidden = true;
   form.hidden = false;
+  if (note) {
+    note.hidden = false;
+    note.textContent = kind === "skill"
+      ? "This skill can be reused directly, but the fields below are still editable."
+      : kind === "variant"
+        ? "This is your manual alternative version for the same scenario. Edit it freely."
+        : "This is an auto-generated draft suggestion. You should edit it before promoting it to a reusable skill.";
+  }
   form.elements.id.value = item.id || "";
   form.elements.kind.value = kind;
   form.elements.name.value = item.name || "";
@@ -207,6 +216,7 @@ function hideDetailPanel() {
   const comparePanel = document.querySelector("[data-compare-panel]");
   const compareContent = document.querySelector("[data-compare-content]");
   const title = document.querySelector("[data-detail-title]");
+  const note = document.querySelector("[data-detail-note]");
   if (!form || !empty) {
     return;
   }
@@ -218,6 +228,9 @@ function hideDetailPanel() {
   empty.hidden = false;
   if (title) {
     title.textContent = "Nothing selected / 当前未选中任何条目";
+  }
+  if (note) {
+    note.hidden = true;
   }
   if (sourcePanel) {
     sourcePanel.hidden = true;

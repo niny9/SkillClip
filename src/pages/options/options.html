@@ -58,29 +58,26 @@
             </div>
           </div>
         </article>
-      </section>
-
-      <section class="dashboard-grid">
         <article class="card">
-          <h2>How To Use / 如何使用</h2>
-          <div class="checklist">
-            <p>1. Inbox / 待整理素材：先存原始 prompt 或最近对话。</p>
-            <p>2. Compile Preview / 编译预览：系统先生成预览给你审核。</p>
-            <p>3. Draft / 技能草稿：确认后再保存成草稿。</p>
-            <p>4. Skill / 正式技能：你确认后，草稿升级成可复用技能。</p>
-            <p>5. Variant / 技能变体：在原有 skill 基础上分叉出新版本。</p>
-            <p>6. Archive / 归档：不会删除，只是移到归档区。</p>
-          </div>
-        </article>
-
-        <article class="card">
-          <h2>Debug Checklist</h2>
-          <div class="checklist">
-            <p>1. If buttons do nothing, refresh the AI page after reloading the extension.</p>
-            <p>2. If capture is empty, make sure the page is one of the supported AI domains.</p>
-            <p>3. If voice fails, check Chrome speech permissions and browser support.</p>
-            <p>4. Open the service worker console from `chrome://extensions` for runtime errors.</p>
-          </div>
+          <h2>Guides / 使用说明</h2>
+          <details class="guide-wrap" open>
+            <summary>How To Use / 如何使用</summary>
+            <div class="checklist">
+              <p>1. 原始素材：你保存的 prompt 或整段对话原文。</p>
+              <p>2. 待确认技能：系统已经按 AI 或本地规则帮你整理过的一版草稿，还没算最终版。</p>
+              <p>3. 可复用技能：你确认通过后，才进入真正可复用区。</p>
+              <p>4. 同场景优化版本：同一个技能的第二版、第三版，由你手动创建和修改。</p>
+            </div>
+          </details>
+          <details class="guide-wrap">
+            <summary>Debug Checklist / 调试说明</summary>
+            <div class="checklist">
+              <p>1. If buttons do nothing, refresh the AI page after reloading the extension.</p>
+              <p>2. If capture is empty, make sure the page is one of the supported AI domains.</p>
+              <p>3. If voice fails, check Chrome speech permissions and browser support.</p>
+              <p>4. Open the service worker console from `chrome://extensions` for runtime errors.</p>
+            </div>
+          </details>
         </article>
       </section>
 
@@ -101,17 +98,6 @@
           <summary>Raw JSON / 原始数据</summary>
           <textarea data-json-output class="code-area" spellcheck="false"></textarea>
         </details>
-      </section>
-
-      <section class="card">
-        <h2>Deployment Path</h2>
-        <div class="checklist">
-          <p>1. Add final icons and screenshots.</p>
-          <p>2. Publish a public privacy policy page.</p>
-          <p>3. Test each supported AI site in Chrome.</p>
-          <p>4. Zip the extension root for release packaging.</p>
-          <p>5. Submit to Chrome Web Store with the privacy disclosures.</p>
-        </div>
       </section>
 
       <section class="card">
@@ -166,6 +152,16 @@
         <p class="muted" data-settings-feedback>
           Local mode is simplest. API mode adds an extra AI review step using your own model settings.
         </p>
+        <details class="guide-wrap">
+          <summary>Deployment Path / 上线步骤</summary>
+          <div class="checklist">
+            <p>1. Add final icons and screenshots.</p>
+            <p>2. Publish a public privacy policy page.</p>
+            <p>3. Test each supported AI site in Chrome.</p>
+            <p>4. Zip the extension root for release packaging.</p>
+            <p>5. Submit to Chrome Web Store with the privacy disclosures.</p>
+          </div>
+        </details>
       </section>
     </main>
     <script type="module" src="./options.js"></script>

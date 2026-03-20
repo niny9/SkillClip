@@ -42,13 +42,21 @@ function inferSteps(turns) {
   const assistantTurns = (turns || []).filter((turn) => turn.role === "assistant").slice(0, 3);
   const steps = [];
 
-  userTurns.forEach((turn, index) => {
-    steps.push(`Capture user requirement ${index + 1}: ${titleFromText(turn.text, "User request")}`);
-  });
+  if (userTurns[0]) {
+    steps.push(`Clarify the task goal: ${titleFromText(userTurns[0].text, "Task goal")}`);
+  }
 
-  assistantTurns.forEach((turn, index) => {
-    steps.push(`Apply AI response pattern ${index + 1}: ${titleFromText(turn.text, "Assistant response")}`);
-  });
+  if (userTurns[1]) {
+    steps.push(`Add constraints or context: ${titleFromText(userTurns[1].text, "Constraints")}`);
+  }
+
+  if (assistantTurns[0]) {
+    steps.push(`Follow the response pattern: ${titleFromText(assistantTurns[0].text, "Response pattern")}`);
+  }
+
+  if (assistantTurns[1]) {
+    steps.push(`Polish the output structure: ${titleFromText(assistantTurns[1].text, "Output structure")}`);
+  }
 
   if (steps.length === 0) {
     steps.push("Describe the task clearly");
@@ -88,11 +96,11 @@ export function compileSkillDraft(payload, settings = {}) {
     kind: "skill_draft",
     status: "preview",
     name,
-    whatItDoes: `Turns a captured AI workflow into a reusable method for ${scenario.toLowerCase()}.`,
+    whatItDoes: `Auto-draft a reusable method from the captured conversation for ${scenario.toLowerCase()}.`,
     scenario,
     useWhen: inferUseWhen(scenario),
     notFor: inferNotFor(scenario),
-    goal: `Reuse a proven workflow from ${payload.platform || "an AI tool"}`,
+    goal: `Draft a reusable workflow based on the captured conversation from ${payload.platform || "an AI tool"}`,
     userIntent: titleFromText(selectedText, "Reuse this AI workflow"),
     inputs,
     constraints: [

@@ -158,6 +158,7 @@
   let activeRecognition = null;
   let cachedSkills = [];
   let lastVoiceTranscript = "";
+  let dragState = null;
 
   init();
 
@@ -258,6 +259,7 @@
     `;
 
     voiceStatus = actionBar.querySelector("[data-voice-status]");
+    makePanelDraggable(actionBar);
 
     actionBar.addEventListener("click", async (event) => {
       const target = event.target;
@@ -396,7 +398,52 @@
       renderSkillList(event.target.value || "");
     });
 
+    makePanelDraggable(palette);
     document.body.appendChild(palette);
+  }
+
+  function makePanelDraggable(panel) {
+    const header = panel.querySelector(".skillclip-panel-header");
+    if (!header) {
+      return;
+    }
+
+    header.addEventListener("pointerdown", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement) || target.closest("button, input")) {
+        return;
+      }
+
+      const rect = panel.getBoundingClientRect();
+      dragState = {
+        panel,
+        offsetX: event.clientX - rect.left,
+        offsetY: event.clientY - rect.top
+      };
+      panel.dataset.dragged = "true";
+      panel.setPointerCapture?.(event.pointerId);
+      window.addEventListener("pointermove", onPanelDrag);
+      window.addEventListener("pointerup", stopPanelDrag, { once: true });
+    });
+  }
+
+  function onPanelDrag(event) {
+    if (!dragState?.panel) {
+      return;
+    }
+
+    const panel = dragState.panel;
+    const left = Math.max(12, Math.min(window.innerWidth - panel.offsetWidth - 12, event.clientX - dragState.offsetX));
+    const top = Math.max(12, Math.min(window.innerHeight - panel.offsetHeight - 12, event.clientY - dragState.offsetY));
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+    panel.style.right = "auto";
+    panel.style.bottom = "auto";
+  }
+
+  function stopPanelDrag() {
+    dragState = null;
+    window.removeEventListener("pointermove", onPanelDrag);
   }
 
   function renderSkillList(query) {

@@ -16,10 +16,10 @@
         <section class="card">
           <h2>Flow / 当前流程</h2>
           <div class="checklist">
-            <p>1. Save Prompt 或 Save Whole Flow：先进入待整理与处理中。</p>
-            <p>2. 你确认后，点 Promote to Skill / 升级成正式技能，进入可复用技能。</p>
-            <p>3. 如果同一场景要做第二版、第三版，就从正式技能创建优化版本。</p>
-            <p>4. Archive 只是从主工作台隐藏，Delete 才是永久删除。</p>
+            <p>1. 原始素材：你刚保存下来的原文或对话。</p>
+            <p>2. 待确认技能：系统已经先帮你整理出一版，但还需要你确认。</p>
+            <p>3. 可复用技能：你确认后，才会进入真正可复用区。</p>
+            <p>4. 同场景优化版本：你自己从正式技能分出的第二版、第三版。</p>
           </div>
         </section>
 
@@ -50,6 +50,7 @@
             </section>
             <section class="queue-column">
               <h3>Pending Skills / 待确认技能</h3>
+              <p class="muted">这里是系统自动整理出的草稿建议，不是最终技能。</p>
               <div data-queue-pending class="stack"></div>
             </section>
           </div>
@@ -73,6 +74,9 @@
         <p class="muted" data-detail-title>Nothing selected / 当前未选中任何条目</p>
         <p class="muted" data-detail-empty>
           Click a draft or skill card to inspect and edit it here.
+        </p>
+        <p class="muted" data-detail-note hidden>
+          These fields are auto-generated draft suggestions from AI or local rules. Edit them before treating them as final.
         </p>
         <form data-detail-form hidden>
           <input type="hidden" name="id" />
