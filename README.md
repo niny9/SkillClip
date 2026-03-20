@@ -1,120 +1,190 @@
 # SkillClip
 
-Turn AI chats into reusable skills.
+把 AI 对话、Prompt 和 Whole Flow 编译成可复用技能。
 
-SkillClip is not a prompt manager. It is an AI skill compiler for people who work across ChatGPT, Claude, Gemini, DeepSeek, Perplexity, and other AI products.
+> Not a prompt manager. An AI skill compiler.
 
-Instead of saving isolated prompt snippets, SkillClip captures the context around a good AI conversation and compiles it into a reusable skill:
+SkillClip 想解决的不是“保存一句 Prompt”，而是：
 
-- Capture prompts, selected text, or recent chat turns
-- Detect source platform, page, model, and conversation metadata
-- Compile multi-turn conversations into structured skill drafts
-- Reuse skills anywhere through a slash palette or shortcut
-- Keep everything local-first, exportable, and versionable
+- 保存 AI 工作流的原始素材
+- 把粗糙 Prompt 优化成更可复用的 Prompt
+- 把多轮对话整理成 Skill
+- 把 Skill 作为 SOP 再插回 AI 输入框复用
+- 在同一场景下继续迭代第二版、第三版
 
-## Why This Exists
+## 一句话理解
 
-Prompt managers hit a ceiling because they mostly store text fragments.
+SkillClip 是一个本地优先的 Chrome 扩展，用来把：
 
-What people actually want is:
+- 单条 Prompt
+- 多条 Prompt
+- 整段 AI 对话流程
 
-- a way to keep the method behind a successful AI conversation
-- a way to reuse that method in different tools
-- a way to evolve and compare better versions over time
+整理成可复用 Skill。
 
-SkillClip is designed around that higher-order asset.
+## Why It Matters
 
-## Product Thesis
+很多 Prompt 工具只能存文本片段。  
+但真正有价值的，往往是：
 
-SkillClip manages three layers of AI work:
+- 一段来回优化出来的对话
+- 一个能复用的方法
+- 一组不断演化的工作流版本
 
-1. Conversation Memory
-   Save the raw material: prompts, chat turns, source URL, model, tags, and context window.
-2. Skill Drafts and Skills
-   Turn a conversation into a structured, editable, reusable method.
-3. Variants and Evolution
-   Track forks, improvements, platform-specific versions, and usage feedback.
+SkillClip 管理的核心资产不是“句子”，而是：
 
-This makes SkillClip closer to an AI workflow asset manager than a prompt library.
+- `Raw Capture / 原始素材`
+- `Skill / 可复用技能`
+- `Variant / 同场景优化版本`
 
-## Strongest MVP
+## Current Features
 
-- Select text and press a shortcut to save a prompt
-- Detect the current AI platform automatically
-- Compile the last N conversation turns into a skill draft
-- Trigger a skill palette with `/` or shortcut inside AI input fields
-- Local-first storage with JSON and Markdown export
+- 保存 `Prompt` 或 `Whole Flow`
+- 优化单条 Prompt
+- 把多条 Prompt 或整段对话编译成 Skill
+- 用 `Workflow Prompts -> Steps -> SOP Runbook` 组织 Skill
+- 编辑 Skill、Workflow Prompt 和 Variant
+- 把 Skill 插回当前 AI 输入框
+- 本地优先保存到 `chrome.storage.local`
+- 导出选中资产的 JSON
 
-## Current Build
+## Supported Platforms
 
-This repository now includes a first Chrome Extension MVP scaffold:
+- ChatGPT
+- Claude
+- Gemini
+- DeepSeek
+- Perplexity
+- Kimi
+- Doubao
+- Yuanbao
+- Qwen / Tongyi
+- Copilot
 
-- `manifest.json` for a loadable MV3 extension
-- action bar for `Save Prompt`, `Compile to Skill`, and `Save Whole Flow`
-- `Voice to Input` for browser-native speech dictation into AI inputs
-- local-first background storage using `chrome.storage.local`
-- popup and side panel workspace
-- slash-triggered skill palette inside supported AI pages
-- heuristic skill compiler with draft and validated skill generation
-- platform adapter structure for ChatGPT, Claude, Gemini, DeepSeek, and Perplexity
+说明：
 
-## Load It In Chrome
+- 不同平台 DOM 差异很大
+- 目前已经有通用适配和部分站点级特化
+- 稳定性还在持续迭代
 
-1. Open `chrome://extensions`
-2. Turn on `Developer mode`
-3. Click `Load unpacked`
-4. Select this folder:
-   `/Users/niny/Documents/GitHub/SkillClip`
+## Core Flow
 
-Then open ChatGPT, Claude, Gemini, DeepSeek, or Perplexity and try:
+1. `Raw Capture / 原始素材`
+   保存单条 Prompt 或 Whole Flow
 
-- `Cmd/Ctrl + Shift + K` to open the action bar
-- `Cmd/Ctrl + Shift + L` to open the skill palette
-- typing `/` in an AI input box to trigger the palette
+2. `Prompt 优化`
+   把粗糙 Prompt 变成更清晰的可复用 Prompt
 
-## What Exists vs. Next
+3. `Skill 编译`
+   把单条 Prompt、多条 Prompt 或整段对话整理成：
+   - 场景
+   - 目标
+   - 步骤
+   - Workflow Prompts
+   - SOP Runbook
 
-Already working in scaffold form:
+4. `Ready Skill / 可复用技能`
+   编辑确认后保存成正式技能
 
-- capture selected text and recent turns
-- detect supported AI platforms with adapter-based DOM extraction
-- create conversation memory items
-- compile skill drafts
-- auto-promote drafts into reusable skills for MVP testing
-- insert a saved skill back into an AI input
-- dictate text into the active AI input with browser speech recognition
+5. `Variant / 同场景优化版本`
+   为同一个 Skill 继续派生第二版、第三版
 
-Next priorities:
+## Screenshots
 
-- richer platform-specific DOM adapters
-- real IndexedDB storage layer
-- draft review actions: merge, variant, archive
-- export to Markdown and JSON files
-- variant diff and lineage UI
+建议后面补这 4 张图：
 
-## Killer Feature
+1. `Workspace / 工作台`
+2. `Whole Flow -> Skill`
+3. `Workflow Prompt 编辑`
+4. `Skill 插入 AI 输入框`
 
-The product should proactively detect high-signal conversations and ask:
+占位命名说明：
 
-`This conversation looks reusable. Compile it into a skill?`
+- [docs/assets/README.md](./docs/assets/README.md)
 
-The pain is not just saving. The pain is forgetting to save at the right moment.
+## Local-First Storage
 
-## Core Docs
+当前数据存储在：
 
+- `chrome.storage.local`
+
+这意味着：
+
+- 同一浏览器用户配置下，重启后通常还在
+- 不会自动同步给别人
+- 不会自动云同步
+- 卸载扩展、清空扩展数据、重置本地数据时会丢失
+
+当前仍然是本地优先模式，还没有后端账户系统。
+
+## Quick Start
+
+1. 打开 `chrome://extensions`
+2. 开启 `Developer mode`
+3. 点击 `Load unpacked`
+4. 选择当前项目根目录
+5. 打开一个支持的 AI 页面
+6. 保存 Prompt 或 Whole Flow
+7. 打开工作台
+8. 编辑并复用生成的 Skill
+
+## Model Assistance
+
+如果你在设置页填写了：
+
+- `API Base URL`
+- `API Model`
+- `API Key`
+
+那么：
+
+- Prompt 优化
+- Workflow Prompt 优化
+- Whole Flow -> Skill 编译
+- Skill Check
+
+都会优先使用你配置的模型。
+
+## Repo Guide
+
+核心文件：
+
+- [manifest.json](./manifest.json)
+- [src/background/service-worker.js](./src/background/service-worker.js)
+- [src/content/content-script.js](./src/content/content-script.js)
+- [src/lib/compiler.js](./src/lib/compiler.js)
+- [src/lib/storage.js](./src/lib/storage.js)
+- [src/pages/sidepanel/sidepanel.html](./src/pages/sidepanel/sidepanel.html)
+- [src/pages/options/options.html](./src/pages/options/options.html)
+
+文档：
+
+- [English README](./README_EN.md)
 - [PRD](./docs/PRD.md)
-- [Information Architecture](./docs/INFORMATION_ARCHITECTURE.md)
-- [Data Model](./docs/DATA_MODEL.md)
-- [Technical Architecture](./docs/TECH_ARCHITECTURE.md)
-- [Open Source Strategy](./docs/OPEN_SOURCE_STRATEGY.md)
-- [Store Readiness](./docs/STORE_READINESS.md)
-- [Development and Packaging](./docs/DEVELOPMENT.md)
-- [Privacy Policy Draft](./PRIVACY.md)
+- [信息架构](./docs/INFORMATION_ARCHITECTURE.md)
+- [数据模型](./docs/DATA_MODEL.md)
+- [技术架构](./docs/TECH_ARCHITECTURE.md)
+- [开发说明](./docs/DEVELOPMENT.md)
+- [开源策略](./docs/OPEN_SOURCE_STRATEGY.md)
+- [公开前检查清单](./docs/PUBLIC_RELEASE_CHECKLIST.md)
+- [隐私说明](./PRIVACY.md)
 
-## Positioning
+## Contributing
 
-- Not a prompt manager
-- Not a snippet library
-- Not another AI sidebar
+欢迎一起补这些方向：
 
-SkillClip is a reusable skill system for AI-native work.
+- 平台 DOM 适配
+- 输入框插入稳定性
+- Skill 编译质量
+- 中文 UX
+- 本地存储升级
+- 导出 / 同步 / Git 文件模式
+
+开始前建议先看：
+
+- [CONTRIBUTING.md](./CONTRIBUTING.md)
+- [ROADMAP.md](./ROADMAP.md)
+
+## License
+
+- [MIT License](./LICENSE)

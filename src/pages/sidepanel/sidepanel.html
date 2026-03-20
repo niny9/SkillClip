@@ -160,26 +160,6 @@
           </div>
         </form>
 
-        <details class="detail-extraction-block detail-fold detail-fold-extraction" data-extraction-panel hidden>
-          <summary>抽取来源</summary>
-          <div data-extraction-content class="stack"></div>
-        </details>
-
-        <details class="detail-validation-block detail-fold detail-fold-validation" data-validation-panel hidden>
-          <summary>自动检查</summary>
-          <div data-validation-content class="stack"></div>
-        </details>
-
-        <details class="detail-extraction-block detail-fold detail-fold-runcheck" data-run-check-panel hidden>
-          <summary>试运行结果</summary>
-          <div data-run-check-content class="stack"></div>
-        </details>
-
-        <details class="detail-source-block detail-fold detail-fold-stepmap" data-step-map-panel hidden>
-          <summary>步骤来源映射</summary>
-          <div data-step-map-content class="stack"></div>
-        </details>
-
         <details class="detail-source-block detail-fold detail-fold-workflow" data-workflow-prompts-panel hidden open>
           <summary>工作流 Prompt</summary>
           <div data-workflow-prompts-content class="stack"></div>
@@ -212,9 +192,33 @@
           <div data-compare-content class="stack"></div>
         </section>
 
-        <details class="detail-source-block detail-fold detail-fold-source" data-source-panel hidden>
-          <summary>原始来源</summary>
-          <div data-source-content class="stack"></div>
+        <details class="detail-fold detail-fold-supporting" data-supporting-panel hidden>
+          <summary>辅助信息</summary>
+
+          <section class="detail-extraction-block detail-subpanel detail-fold-extraction" data-extraction-panel hidden>
+            <h3>抽取来源</h3>
+            <div data-extraction-content class="stack"></div>
+          </section>
+
+          <section class="detail-validation-block detail-subpanel detail-fold-validation" data-validation-panel hidden>
+            <h3>自动检查</h3>
+            <div data-validation-content class="stack"></div>
+          </section>
+
+          <section class="detail-extraction-block detail-subpanel detail-fold-runcheck" data-run-check-panel hidden>
+            <h3>试运行结果</h3>
+            <div data-run-check-content class="stack"></div>
+          </section>
+
+          <section class="detail-source-block detail-subpanel detail-fold-stepmap" data-step-map-panel hidden>
+            <h3>步骤来源映射</h3>
+            <div data-step-map-content class="stack"></div>
+          </section>
+
+          <section class="detail-source-block detail-subpanel detail-fold-source" data-source-panel hidden>
+            <h3>原始来源</h3>
+            <div data-source-content class="stack"></div>
+          </section>
         </details>
       </aside>
     </main>

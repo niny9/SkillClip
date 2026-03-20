@@ -22,6 +22,26 @@ async function load() {
   renderSelectedCount();
 }
 
+function updateSupportingPanelVisibility() {
+  const wrapper = document.querySelector("[data-supporting-panel]");
+  if (!(wrapper instanceof HTMLElement)) {
+    return;
+  }
+
+  const hasVisibleChild = [
+    "[data-extraction-panel]",
+    "[data-validation-panel]",
+    "[data-run-check-panel]",
+    "[data-step-map-panel]",
+    "[data-source-panel]"
+  ].some((selector) => {
+    const node = document.querySelector(selector);
+    return node instanceof HTMLElement && !node.hidden;
+  });
+
+  wrapper.hidden = !hasVisibleChild;
+}
+
 function setFeedback(message) {
   const node = document.querySelector("[data-feedback]");
   if (node) {
@@ -146,6 +166,7 @@ function getCurrentPlatformHint() {
 function renderConversation(item) {
   const linkedDraft = findLinkedDraftForConversation(item.id);
   const hasAutoDraft = Boolean(linkedDraft);
+  const pending = !hasAutoDraft;
   const summaryText = linkedDraft?.useWhen || linkedDraft?.goal || linkedDraft?.scenario || "这条素材还没有整理出技能建议。";
   const directActionLabel = linkedDraft
     ? "Promote to Skill / 直接升级成技能"
@@ -154,16 +175,16 @@ function renderConversation(item) {
     ? `<button type="button" data-action="edit-conversation-draft" data-id="${item.id}">Edit Suggestion / 编辑整理结果</button>`
     : "";
   return `
-    <article class="list-card clickable-card queue-card queue-card-raw" data-detail-kind="conversation" data-detail-id="${item.id}">
+    <article class="list-card clickable-card queue-card queue-card-raw ${pending ? "queue-card-pending" : ""}" data-detail-kind="conversation" data-detail-id="${item.id}">
       <strong>${escapeHtml(item.selectedText || item.sourceTitle || "Captured conversation")}</strong>
       <label class="inline-check">
         <input type="checkbox" data-select-conversation="${item.id}" ${selectedConversationIds.has(item.id) ? "checked" : ""} />
         <span>Select / 选择</span>
       </label>
-      <span class="queue-badge">Raw capture / 原始素材</span>
+      <span class="queue-badge ${pending ? "queue-badge-pending" : ""}">${pending ? "正在整理中 / 原始素材" : "原始素材"}</span>
       <span>Source / 来源: ${escapeHtml(item.sourcePlatform || "other")} · Mode / 方式: ${escapeHtml(item.captureMode)}</span>
       <div class="meta-block">
-        <small>${hasAutoDraft ? `已自动整理：${escapeHtml(linkedDraft.status === "draft" ? "可编辑草稿" : "自动建议")}` : "还没有自动整理结果。"}</small>
+        <small>${hasAutoDraft ? `已自动整理：${escapeHtml(linkedDraft.status === "draft" ? "可编辑草稿" : "自动建议")}` : "系统还在整理这条素材，请稍等。"}</small>
         <small>${escapeHtml(summaryText)}</small>
       </div>
       <div class="action-row">
@@ -322,6 +343,7 @@ function showDetailPanel(item, kind) {
     renderStepMapPreview(null, item.turns || []);
     renderVariantCompare(item, kind);
     renderSourcePreview(item);
+    updateSupportingPanelVisibility();
     return;
   }
   form.elements.id.value = item.id || "";
@@ -342,6 +364,7 @@ function showDetailPanel(item, kind) {
   renderWorkflowPromptsPreview(item.workflowPrompts || []);
   renderVariantCompare(item, kind);
   renderSourcePreview(item);
+  updateSupportingPanelVisibility();
 }
 
 function hideDetailPanel() {
@@ -350,6 +373,7 @@ function hideDetailPanel() {
   const form = document.querySelector("[data-detail-form]");
   const empty = document.querySelector("[data-detail-empty]");
   const sourcePanel = document.querySelector("[data-source-panel]");
+  const supportingPanel = document.querySelector("[data-supporting-panel]");
   const sourceContent = document.querySelector("[data-source-content]");
   const optimizedPanel = document.querySelector("[data-optimized-prompt-panel]");
   const optimizedContent = document.querySelector("[data-optimized-prompt-content]");
@@ -390,6 +414,9 @@ function hideDetailPanel() {
   }
   if (sourcePanel) {
     sourcePanel.hidden = true;
+  }
+  if (supportingPanel) {
+    supportingPanel.hidden = true;
   }
   if (sourceContent) {
     sourceContent.innerHTML = "";
@@ -445,6 +472,7 @@ function hideDetailPanel() {
   if (compareContent) {
     compareContent.innerHTML = "";
   }
+  updateSupportingPanelVisibility();
 }
 
 function renderOptimizedPrompt(item) {

@@ -256,14 +256,7 @@
           <span>应用模式</span>
           <select name="applyMode">
             <option value="draft">只插入草稿</option>
-            <option value="send">插入后尝试发送</option>
           </select>
-        </label>
-        <label class="skillclip-field">
-          <span>
-            <input name="previewBeforeSend" type="checkbox" checked />
-            发送前先预览一次
-          </span>
         </label>
         <div data-skill-status class="skillclip-panel-tip">请先填写变量，然后选择应用方式。</div>
         <div data-skill-preview class="skillclip-preview" hidden></div>
@@ -853,12 +846,6 @@
     }
 
     const adapter = getCurrentAdapter();
-    if (result.applyMode === "send") {
-      showToast("正在准备新对话并应用技能...");
-      await tryOpenFreshChat(adapter.id);
-      await wait(380);
-    }
-
     const activeInput = lastFocusedInput instanceof HTMLElement && lastFocusedInput.isConnected && isVisible(lastFocusedInput)
       ? lastFocusedInput
       : document.activeElement instanceof HTMLElement && matchesInputTarget(document.activeElement)
@@ -879,12 +866,7 @@
       return false;
     }
 
-    if (result.applyMode === "send") {
-      const sent = trySubmitCurrentInput();
-      showToast(sent ? "技能已插入并尝试发送" : "技能已插入，但当前页面未找到发送按钮");
-    } else {
-      showToast("技能内容已插入到当前输入框");
-    }
+    showToast("技能内容已插入到当前输入框");
     return success;
   }
 
@@ -990,23 +972,14 @@
           showToast(`请先填写必填项：${missingRequired.join("、")}`);
           return;
         }
-        values.__applyMode = String(formData.get("applyMode") || "draft");
-        values.__previewBeforeSend = formData.get("previewBeforeSend") === "on" ? "true" : "false";
+        values.__applyMode = "draft";
         const previewText = applyInputValues(skill.promptTemplate || "", values);
-        if (values.__applyMode === "send" && values.__previewBeforeSend === "true" && preview instanceof HTMLElement && !preview.dataset.confirmed) {
+        if (preview instanceof HTMLElement) {
           preview.hidden = false;
           preview.textContent = previewText || "当前技能没有可预览内容。";
-          preview.dataset.confirmed = "true";
-          if (status instanceof HTMLElement) {
-            status.textContent = "已生成发送前预览。请确认内容后，再点一次“应用技能”。";
-          }
-          showToast("请先检查预览内容，再点一次应用技能");
-          return;
         }
         if (status instanceof HTMLElement) {
-          status.textContent = values.__applyMode === "send"
-            ? "正在应用技能，并准备尝试发送..."
-            : "正在把技能内容插入输入框...";
+          status.textContent = "正在把技能内容插入输入框...";
         }
         chrome.runtime.sendMessage({
           type: MESSAGE_TYPES.SAVE_SKILL_INPUT_MEMORY,
@@ -1096,55 +1069,6 @@
     }
 
     return false;
-  }
-
-  async function tryOpenFreshChat(platformId) {
-    const selectorsByPlatform = {
-      [PLATFORMS.GEMINI]: [
-        "a[aria-label*='New chat']",
-        "button[aria-label*='New chat']",
-        "button[aria-label*='新对话']",
-        "a[href='/app']"
-      ],
-      [PLATFORMS.DEEPSEEK]: [
-        "button[aria-label*='新对话']",
-        "button[aria-label*='New chat']",
-        "a[href*='new']"
-      ],
-      [PLATFORMS.KIMI]: [
-        "button[aria-label*='新建对话']",
-        "button[aria-label*='新对话']",
-        "button[aria-label*='New chat']"
-      ],
-      [PLATFORMS.DOUBAO]: [
-        "button[aria-label*='新对话']",
-        "button[aria-label*='新建']"
-      ],
-      [PLATFORMS.QWEN]: [
-        "button[aria-label*='新对话']",
-        "button[aria-label*='New chat']"
-      ],
-      [PLATFORMS.COPILOT]: [
-        "button[aria-label*='New topic']",
-        "button[aria-label*='新对话']",
-        "button[aria-label*='New chat']"
-      ]
-    };
-
-    const candidates = selectorsByPlatform[platformId] || [];
-    for (const selector of candidates) {
-      const button = Array.from(document.querySelectorAll(selector))
-        .find((node) => node instanceof HTMLElement && isVisible(node) && !isInsideSkillclipUi(node));
-      if (button instanceof HTMLElement) {
-        button.click();
-        return true;
-      }
-    }
-    return false;
-  }
-
-  function wait(ms) {
-    return new Promise((resolve) => window.setTimeout(resolve, ms));
   }
 
   function toggleVoiceCapture(button) {

@@ -737,12 +737,6 @@ document.addEventListener("click", async (event) => {
     setFeedback("Local data reset.");
   }
 
-  if (action === "seed-demo") {
-    await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.SEED_DEMO });
-    await load();
-    setFeedback("Demo skill seeded.");
-  }
-
   if (action === "save-settings") {
     await chrome.runtime.sendMessage({
       type: MESSAGE_TYPES.UPDATE_SETTINGS,

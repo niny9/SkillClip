@@ -210,6 +210,22 @@ p {
   background: rgba(255, 255, 255, 0.72);
 }
 
+.detail-fold-supporting {
+  border-left: 5px solid #7b6d56;
+}
+
+.detail-subpanel {
+  margin-top: 0.85rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(214, 203, 184, 0.85);
+}
+
+.detail-subpanel h3 {
+  margin-bottom: 0.7rem;
+}
+
 .detail-fold summary {
   cursor: pointer;
   list-style: none;
@@ -252,6 +268,17 @@ p {
 
 .status-running strong {
   color: #244a77;
+}
+
+.queue-badge-pending {
+  color: #a0362f;
+  background: rgba(245, 221, 217, 0.92);
+  border: 1px solid rgba(189, 86, 74, 0.5);
+}
+
+.queue-card-pending {
+  border-color: rgba(189, 86, 74, 0.45);
+  background: rgba(255, 246, 244, 0.92);
 }
 
 .action-row {
