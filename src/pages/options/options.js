@@ -27,7 +27,6 @@ async function load() {
 
   updateCount("conversations", state.conversations.filter((item) => !item.archivedAt).length);
   updateCount("supported_tabs", await countSupportedTabs());
-  updateCount("in_progress", state.drafts.filter((item) => item.status === "preview" || item.status === "draft").length);
   updateCount("skills", state.skills.filter((item) => item.status !== "archived").length);
   updateCount("variants", state.variants.length);
   updateCount(
@@ -62,20 +61,36 @@ function renderAssetBrowser(state) {
     return;
   }
 
-  const inboxItems = state.conversations.filter((item) => !item.archivedAt);
-  const previewItems = state.drafts.filter((item) => item.status === "preview").map((item) => ({ ...item, uiStage: "preview" }));
-  const draftItems = state.drafts.filter((item) => item.status === "draft").map((item) => ({ ...item, uiStage: "draft" }));
-  const inProgressItems = [...previewItems, ...draftItems];
+  const viewMode = document.querySelector("[data-asset-view]")?.value || "stage";
+  const platformFilter = document.querySelector("[data-platform-filter]")?.value || "all";
+  const scenarioFilter = document.querySelector("[data-scenario-filter]")?.value || "all";
+  populateAssetFilters(state);
+
+  const inboxItems = state.conversations
+    .filter((item) => !item.archivedAt)
+    .filter((item) => matchesAssetFilters(item, platformFilter, scenarioFilter, state));
   const skillItems = state.skills.filter((item) => item.status !== "archived");
-  const variantItems = state.variants || [];
+  const filteredSkillItems = skillItems.filter((item) => matchesAssetFilters(item, platformFilter, scenarioFilter, state));
+  const variantItems = (state.variants || []).filter((item) => matchesAssetFilters(item, platformFilter, scenarioFilter, state));
   const archivedItems = [
     ...state.conversations.filter((item) => item.archivedAt).map((item) => ({ ...item, kind: "conversation" })),
     ...state.drafts.filter((item) => item.status === "archived").map((item) => ({ ...item, kind: "draft" })),
     ...state.skills.filter((item) => item.status === "archived").map((item) => ({ ...item, kind: "skill" }))
-  ];
+  ].filter((item) => matchesAssetFilters(item, platformFilter, scenarioFilter, state));
+
+  if (viewMode === "platform") {
+    node.innerHTML = renderGroupedBrowserByPlatform({ inboxItems, skillItems: filteredSkillItems, variantItems, archivedItems }, state);
+    return;
+  }
+
+  if (viewMode === "scenario") {
+    node.innerHTML = renderGroupedBrowserByScenario({ inboxItems, skillItems: filteredSkillItems, variantItems, archivedItems }, state);
+    return;
+  }
 
   node.innerHTML = [
-    renderBrowserList("Inbox / 待整理素材", "inbox", inboxItems, (item) => {
+    renderBrowserList("Raw Captures / 原始素材", "inbox", inboxItems, (item) => {
+      const linkedDraft = findLinkedDraftForConversation(item.id, state);
       const title = item.sourceTitle || item.selectedText || item.sourcePlatform || "Untitled capture";
       const subtitle = `${item.sourcePlatform || "unknown"} · ${item.captureMode || "capture"}`;
       const preview = item.selectedText || item.turns?.[0]?.text || "";
@@ -83,6 +98,7 @@ function renderAssetBrowser(state) {
         <article class="browser-item clickable-card" data-asset-kind="conversation" data-asset-id="${item.id}">
           <strong>${escapeHtml(title)}</strong>
           <p class="muted">${escapeHtml(subtitle)}</p>
+          <p class="muted">${escapeHtml(linkedDraft ? `Linked suggestion / 已整理建议: ${linkedDraft.name || linkedDraft.scenario || "Untitled"}` : "No linked suggestion yet / 还没有整理结果")}</p>
           <p>${escapeHtml(preview.slice(0, 180) || "No preview text yet.")}</p>
           <div class="action-row">
             <button type="button" data-action="archive-asset" data-kind="conversation" data-id="${item.id}">Archive / 归档</button>
@@ -91,19 +107,7 @@ function renderAssetBrowser(state) {
         </article>
       `;
     }),
-    renderBrowserList("Pending Skills / 待确认技能", "pending", inProgressItems, (item) => `
-      <article class="browser-item clickable-card" data-asset-kind="draft" data-asset-id="${item.id}">
-        <strong>${escapeHtml(item.name || "Untitled skill in progress")}</strong>
-        <p class="muted">${escapeHtml(item.uiStage === "preview" ? "Preview / 系统刚生成，待你确认" : "Draft / 你已确认，可继续编辑")}</p>
-        <p class="muted">${escapeHtml(item.useWhen || item.scenario || "No use-when summary yet.")}</p>
-        <p>${escapeHtml((item.outputFormat || item.goal || "").slice(0, 180) || "No output format summary yet.")}</p>
-        <div class="action-row">
-          <button type="button" data-action="archive-asset" data-kind="draft" data-id="${item.id}">Archive / 归档</button>
-          <button type="button" data-action="delete-asset" data-kind="draft" data-id="${item.id}">Delete / 删除</button>
-        </div>
-      </article>
-    `),
-    renderBrowserList("Ready Skills / 可复用技能", "ready", skillItems, (item) => {
+    renderBrowserList("Ready Skills / 可复用技能", "ready", filteredSkillItems, (item) => {
       const variantCount = variantItems.filter((variant) => variant.baseSkillId === item.id).length;
       return `
         <article class="browser-item clickable-card" data-asset-kind="skill" data-asset-id="${item.id}">
@@ -155,6 +159,159 @@ function renderBrowserList(title, stage, items, renderer) {
       <div class="browser-list">${content}</div>
     </section>
   `;
+}
+
+function renderGroupedBrowserByPlatform(groups, state) {
+  const keys = collectUniqueGroupKeys([
+    ...groups.inboxItems.map((item) => getAssetPlatform(item, state)),
+    ...groups.skillItems.map((item) => getAssetPlatform(item, state)),
+    ...groups.variantItems.map((item) => getAssetPlatform(item, state)),
+    ...groups.archivedItems.map((item) => getAssetPlatform(item, state))
+  ]);
+
+  return keys.map((key) => {
+    const items = [
+      ...groups.inboxItems.filter((item) => getAssetPlatform(item, state) === key).map((item) => ({ ...item, _kind: "conversation" })),
+      ...groups.skillItems.filter((item) => getAssetPlatform(item, state) === key).map((item) => ({ ...item, _kind: "skill" })),
+      ...groups.variantItems.filter((item) => getAssetPlatform(item, state) === key).map((item) => ({ ...item, _kind: "variant" })),
+      ...groups.archivedItems.filter((item) => getAssetPlatform(item, state) === key).map((item) => ({ ...item, _kind: item.kind || "conversation" }))
+    ];
+    return renderGroupedSection(`Platform / 平台: ${key}`, "platform", items);
+  }).join("");
+}
+
+function renderGroupedBrowserByScenario(groups, state) {
+  const keys = collectUniqueGroupKeys([
+    ...groups.inboxItems.map((item) => getAssetScenario(item, state)),
+    ...groups.skillItems.map((item) => getAssetScenario(item, state)),
+    ...groups.variantItems.map((item) => getAssetScenario(item, state)),
+    ...groups.archivedItems.map((item) => getAssetScenario(item, state))
+  ]);
+
+  return keys.map((key) => {
+    const items = [
+      ...groups.inboxItems.filter((item) => getAssetScenario(item, state) === key).map((item) => ({ ...item, _kind: "conversation" })),
+      ...groups.skillItems.filter((item) => getAssetScenario(item, state) === key).map((item) => ({ ...item, _kind: "skill" })),
+      ...groups.variantItems.filter((item) => getAssetScenario(item, state) === key).map((item) => ({ ...item, _kind: "variant" })),
+      ...groups.archivedItems.filter((item) => getAssetScenario(item, state) === key).map((item) => ({ ...item, _kind: item.kind || "conversation" }))
+    ];
+    return renderGroupedSection(`Scenario / 场景: ${key}`, "scenario", items);
+  }).join("");
+}
+
+function renderGroupedSection(title, stage, items) {
+  const content = items.length
+    ? items.map((item) => renderCompactAssetItem(item)).join("")
+    : "<p class='muted'>Nothing here yet.</p>";
+  return `
+    <section class="browser-section browser-section-${stage}">
+      <div class="status-line">
+        <span>${title}</span>
+        <strong>${items.length}</strong>
+      </div>
+      <div class="browser-list">${content}</div>
+    </section>
+  `;
+}
+
+function renderCompactAssetItem(item) {
+  const labelMap = {
+    conversation: "Raw / 原始素材",
+    skill: "Skill / 技能",
+    variant: "Variant / 优化版",
+    draft: "Draft / 草稿"
+  };
+  const title = item.name || item.sourceTitle || item.selectedText || "Untitled asset";
+  const preview = item.selectedText || item.useWhen || item.goal || item.promptTemplate || item.turns?.[0]?.text || "";
+  return `
+    <article class="browser-item clickable-card" data-asset-kind="${escapeHtml(item._kind || item.kind || "conversation")}" data-asset-id="${item.id}">
+      <strong>${escapeHtml(title)}</strong>
+      <p class="muted">${escapeHtml(labelMap[item._kind || item.kind || "conversation"] || "Asset")}</p>
+      <p>${escapeHtml(String(preview).slice(0, 180) || "No preview text yet.")}</p>
+    </article>
+  `;
+}
+
+function collectUniqueGroupKeys(values) {
+  return Array.from(new Set(values.filter(Boolean))).sort((left, right) => left.localeCompare(right));
+}
+
+function populateAssetFilters(state) {
+  const platformSelect = document.querySelector("[data-platform-filter]");
+  const scenarioSelect = document.querySelector("[data-scenario-filter]");
+  if (!platformSelect || !scenarioSelect) {
+    return;
+  }
+
+  const currentPlatform = platformSelect.value || "all";
+  const currentScenario = scenarioSelect.value || "all";
+  const assets = [
+    ...state.conversations,
+    ...state.drafts,
+    ...state.skills,
+    ...state.variants
+  ];
+  const platforms = collectUniqueGroupKeys(assets.map((item) => getAssetPlatform(item, state)));
+  const scenarios = collectUniqueGroupKeys(assets.map((item) => getAssetScenario(item, state)));
+
+  platformSelect.innerHTML = [`<option value="all">All / 全部</option>`, ...platforms.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`)].join("");
+  scenarioSelect.innerHTML = [`<option value="all">All / 全部</option>`, ...scenarios.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`)].join("");
+  platformSelect.value = platforms.includes(currentPlatform) ? currentPlatform : "all";
+  scenarioSelect.value = scenarios.includes(currentScenario) ? currentScenario : "all";
+}
+
+function matchesAssetFilters(item, platformFilter, scenarioFilter, state) {
+  const platform = getAssetPlatform(item, state);
+  const scenario = getAssetScenario(item, state);
+  const matchesPlatform = platformFilter === "all" || platform === platformFilter;
+  const matchesScenario = scenarioFilter === "all" || scenario === scenarioFilter;
+  return matchesPlatform && matchesScenario;
+}
+
+function getAssetPlatform(item, state) {
+  if (!item) {
+    return "other";
+  }
+  if (item.sourcePlatform) {
+    return item.sourcePlatform;
+  }
+  if (item.kind === "variant" || item.baseSkillId) {
+    const baseSkill = state.skills.find((skill) => skill.id === item.baseSkillId);
+    return getAssetPlatform(baseSkill, state);
+  }
+  if (item.sourceConversationIds?.length) {
+    const source = state.conversations.find((conversation) => item.sourceConversationIds.includes(conversation.id));
+    return source?.sourcePlatform || "other";
+  }
+  return "other";
+}
+
+function getAssetScenario(item, state) {
+  if (!item) {
+    return "general";
+  }
+  if (item.scenarioOverride) {
+    return item.scenarioOverride;
+  }
+  if (item.scenario) {
+    return item.scenario;
+  }
+  if (item.kind === "conversation_memory" || item.captureMode) {
+    const linkedDraft = findLinkedDraftForConversation(item.id, state);
+    return linkedDraft?.scenario || item.inferredScenario || "general";
+  }
+  if (item.baseSkillId) {
+    const baseSkill = state.skills.find((skill) => skill.id === item.baseSkillId);
+    return baseSkill?.scenario || "general";
+  }
+  return "general";
+}
+
+function findLinkedDraftForConversation(conversationId, state = latestState) {
+  return state?.drafts?.find((draft) => (
+    (draft.status === "preview" || draft.status === "draft")
+      && (draft.sourceConversationIds || []).includes(conversationId)
+  )) || null;
 }
 
 function escapeHtml(value) {
@@ -456,12 +613,12 @@ function getSuggestedBaseUrl(provider) {
   return "";
 }
 
-function downloadJson(text) {
+function downloadJson(text, fileName = "skillclip-state.json") {
   const blob = new Blob([text], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = "skillclip-state.json";
+  anchor.download = fileName;
   anchor.click();
   URL.revokeObjectURL(url);
 }
@@ -506,7 +663,10 @@ document.addEventListener("click", async (event) => {
   }
 
   if (action === "download-json") {
-    downloadJson(document.querySelector("[data-json-output]").value);
+    const fileName = selectedAssetSnapshot
+      ? `skillclip-${selectedAssetSnapshot.kind}-${selectedAssetSnapshot.id}.json`
+      : "skillclip-state.json";
+    downloadJson(document.querySelector("[data-json-output]").value, fileName);
     setFeedback("JSON download started.");
   }
 
@@ -559,6 +719,22 @@ document.addEventListener("click", async (event) => {
   if (assetCard instanceof HTMLElement && !target.closest("button")) {
     showSelectedAssetJson(assetCard.dataset.assetKind, assetCard.dataset.assetId);
     return;
+  }
+});
+
+document.addEventListener("change", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+
+  if (target.matches("[data-asset-view], [data-platform-filter], [data-scenario-filter]")) {
+    renderAssetBrowser(latestState || {
+      conversations: [],
+      drafts: [],
+      skills: [],
+      variants: []
+    });
   }
 });
 

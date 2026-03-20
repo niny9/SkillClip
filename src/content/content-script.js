@@ -159,6 +159,7 @@
   let cachedSkills = [];
   let lastVoiceTranscript = "";
   let dragState = null;
+  let lastFocusedInput = null;
 
   init();
 
@@ -181,7 +182,15 @@
     });
 
     document.addEventListener("keydown", onKeydown, true);
+    document.addEventListener("focusin", onFocusIn, true);
     loadState();
+  }
+
+  function onFocusIn(event) {
+    const target = event.target;
+    if (target instanceof HTMLElement && matchesInputTarget(target) && isVisible(target)) {
+      lastFocusedInput = target;
+    }
   }
 
   async function loadState() {
@@ -212,6 +221,7 @@
     closeSkillPalette();
     ensureActionBar();
     renderActionBarMeta();
+    ensurePanelVisible(actionBar);
     actionBar.classList.add("skillclip-visible");
   }
 
@@ -223,6 +233,7 @@
     closeActionBar();
     ensureSkillPalette();
     renderSkillList("");
+    ensurePanelVisible(palette);
     palette.classList.add("skillclip-visible");
     const input = palette.querySelector("input");
     input.value = "";
@@ -391,7 +402,11 @@
         payload: { skillId }
       });
       showToast(`Inserted "${skill.name}"`);
-      closeSkillPalette();
+      const searchInput = palette.querySelector("input");
+      if (searchInput instanceof HTMLInputElement) {
+        searchInput.focus();
+        searchInput.select();
+      }
     });
 
     palette.querySelector("input").addEventListener("input", (event) => {
@@ -435,6 +450,35 @@
     const panel = dragState.panel;
     const left = Math.max(12, Math.min(window.innerWidth - panel.offsetWidth - 12, event.clientX - dragState.offsetX));
     const top = Math.max(12, Math.min(window.innerHeight - panel.offsetHeight - 12, event.clientY - dragState.offsetY));
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+    panel.style.right = "auto";
+    panel.style.bottom = "auto";
+  }
+
+  function ensurePanelVisible(panel) {
+    if (!panel) {
+      return;
+    }
+
+    const rect = panel.getBoundingClientRect();
+    const maxLeft = Math.max(12, window.innerWidth - rect.width - 12);
+    const maxTop = Math.max(12, window.innerHeight - rect.height - 12);
+    const outOfBounds = rect.right > window.innerWidth || rect.bottom > window.innerHeight || rect.left < 0 || rect.top < 0;
+
+    if (!panel.dataset.dragged || outOfBounds) {
+      panel.style.left = "auto";
+      panel.style.bottom = "auto";
+      panel.style.right = "18px";
+      panel.style.top = "18px";
+      if (panel.classList.contains("skillclip-palette")) {
+        panel.style.top = `${Math.min(64, maxTop)}px`;
+      }
+      return;
+    }
+
+    const left = Math.max(12, Math.min(maxLeft, rect.left));
+    const top = Math.max(12, Math.min(maxTop, rect.top));
     panel.style.left = `${left}px`;
     panel.style.top = `${top}px`;
     panel.style.right = "auto";
@@ -661,6 +705,10 @@
   }
 
   function getActiveInput() {
+    if (lastFocusedInput instanceof HTMLElement && lastFocusedInput.isConnected && isVisible(lastFocusedInput)) {
+      return lastFocusedInput;
+    }
+
     const adapter = getCurrentAdapter();
     const selectors = [...(adapter.inputSelectors || []), "textarea", "div[contenteditable='true']", "div[role='textbox']", "input[type='text']"];
 
@@ -679,7 +727,9 @@
   }
 
   function insertSkill(skill) {
-    const activeInput = document.activeElement instanceof HTMLElement && matchesInputTarget(document.activeElement)
+    const activeInput = lastFocusedInput instanceof HTMLElement && lastFocusedInput.isConnected && isVisible(lastFocusedInput)
+      ? lastFocusedInput
+      : document.activeElement instanceof HTMLElement && matchesInputTarget(document.activeElement)
       ? document.activeElement
       : getActiveInput();
 
@@ -690,6 +740,7 @@
     }
 
     insertTextIntoInput(activeInput, text, false);
+    lastFocusedInput = activeInput;
   }
 
   function resolveTemplate(skill) {
@@ -725,6 +776,8 @@
       showToast("No writable AI input found");
       return;
     }
+
+    lastFocusedInput = activeInput;
 
     const recognition = new Recognition();
     recognition.lang = document.documentElement.lang || navigator.language || "en-US";

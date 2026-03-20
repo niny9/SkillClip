@@ -17,9 +17,9 @@
           <h2>Flow / 当前流程</h2>
           <div class="checklist">
             <p>1. 原始素材：你刚保存下来的原文或对话。</p>
-            <p>2. 待确认技能：系统已经先帮你整理出一版，但还需要你确认。</p>
-            <p>3. 可复用技能：你确认后，才会进入真正可复用区。</p>
-            <p>4. 同场景优化版本：你自己从正式技能分出的第二版、第三版。</p>
+            <p>2. 可复用技能：原始素材会自动整理，你可以直接编辑，或直接升级成正式技能。</p>
+            <p>3. 同场景优化版本：你自己从正式技能分出的第二版、第三版。</p>
+            <p>4. 已归档：不再常用，但仍保留在本地资产里。</p>
           </div>
         </section>
 
@@ -41,23 +41,14 @@
         </section>
 
         <section class="card">
-          <h2>Queue / 待整理与处理中</h2>
-          <p class="muted">这里既有原始素材，也有系统刚整理好的待确认技能。</p>
-          <div class="queue-grid">
-            <section class="queue-column">
-              <h3>Raw Captures / 原始素材</h3>
-              <div data-queue-raw class="stack"></div>
-            </section>
-            <section class="queue-column">
-              <h3>Pending Skills / 待确认技能</h3>
-              <p class="muted">这里是系统自动整理出的草稿建议，不是最终技能。</p>
-              <div data-queue-pending class="stack"></div>
-            </section>
-          </div>
+          <h2>Raw Captures / 原始素材</h2>
+          <p class="muted">这里是你保存下来的原始内容。系统会自动整理一版建议；你可以直接编辑，或者直接升级为正式技能。</p>
+          <div data-queue-raw class="stack"></div>
         </section>
 
         <section class="card">
           <h2>Ready Skills / 可复用技能</h2>
+          <p class="muted">这里是已经可以直接插入到 AI 对话框里的技能。</p>
           <div data-skills class="stack"></div>
         </section>
 

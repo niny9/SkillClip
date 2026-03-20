@@ -9,12 +9,9 @@ async function load() {
   latestState = state;
 
   const activeConversations = state.conversations.filter((item) => !item.archivedAt);
-  const previewDrafts = state.drafts.filter((item) => item.status === "preview").map((item) => ({ ...item, uiStage: "preview" }));
-  const activeDrafts = state.drafts.filter((item) => item.status === "draft").map((item) => ({ ...item, uiStage: "draft" }));
   const activeSkills = state.skills.filter((item) => item.status !== "archived");
 
   renderList("[data-queue-raw]", activeConversations, renderConversation);
-  renderList("[data-queue-pending]", [...previewDrafts, ...activeDrafts], renderInProgressItem);
   renderSkills("[data-skills]", activeSkills, state.variants);
   renderVariants("[data-variants]", state.variants, state.skills);
 }
@@ -86,44 +83,28 @@ function renderVariants(selector, variants, skills) {
 }
 
 function renderConversation(item) {
-  const hasAutoPreview = latestState?.drafts?.some((draft) => (
-    (draft.status === "preview" || draft.status === "draft")
-      && (draft.sourceConversationIds || []).includes(item.id)
-  ));
+  const linkedDraft = findLinkedDraftForConversation(item.id);
+  const hasAutoDraft = Boolean(linkedDraft);
+  const summaryText = linkedDraft?.useWhen || linkedDraft?.goal || linkedDraft?.scenario || "这条素材还没有整理出技能建议。";
+  const directActionLabel = linkedDraft
+    ? "Promote to Skill / 直接升级成技能"
+    : "Generate Skill / 生成技能";
+  const editButton = linkedDraft
+    ? `<button type="button" data-action="edit-conversation-draft" data-id="${item.id}">Edit Suggestion / 编辑整理结果</button>`
+    : "";
   return `
     <article class="list-card queue-card queue-card-raw">
       <strong>${escapeHtml(item.selectedText || item.sourceTitle || "Captured conversation")}</strong>
       <span class="queue-badge">Raw capture / 原始素材</span>
       <span>Source / 来源: ${escapeHtml(item.sourcePlatform || "other")} · Mode / 方式: ${escapeHtml(item.captureMode)}</span>
       <div class="meta-block">
-        <small>${hasAutoPreview ? "A preview already exists for this source. / 这条素材已经生成过预览。" : "Next step / 下一步: compile this source into a preview."}</small>
+        <small>${hasAutoDraft ? `Auto suggestion ready / 已自动整理: ${escapeHtml(linkedDraft.status === "draft" ? "可编辑草稿" : "自动建议")}` : "No auto suggestion yet / 还没有自动整理结果。"}</small>
+        <small>${escapeHtml(summaryText)}</small>
       </div>
       <div class="action-row">
-        <button type="button" data-action="compile-conversation" data-id="${item.id}">Compile to Preview / 编译为预览</button>
+        ${editButton}
+        <button type="button" data-action="promote-conversation" data-id="${item.id}">${directActionLabel}</button>
         <button type="button" data-action="delete-conversation" data-id="${item.id}">Delete / 删除</button>
-      </div>
-    </article>
-  `;
-}
-
-function renderInProgressItem(item) {
-  const stageLine = item.uiStage === "preview"
-    ? "Preview / 系统刚生成，等你确认"
-    : "Draft / 你已确认，可继续编辑";
-  const primaryButton = item.uiStage === "preview"
-    ? `<button type="button" data-action="approve-preview" data-id="${item.id}">Save as Draft / 保存为草稿</button>`
-    : `<button type="button" data-action="promote-draft" data-id="${item.id}">Promote to Skill / 升级成技能</button>`;
-  return `
-    <article class="list-card clickable-card queue-card queue-card-pending" data-detail-kind="draft" data-detail-id="${item.id}">
-      <strong>${escapeHtml(item.name)}</strong>
-      <span class="queue-badge">${escapeHtml(item.uiStage === "preview" ? "Preview / 待确认" : "Draft / 可编辑")}</span>
-      <span>${escapeHtml(stageLine)} · ${escapeHtml(item.scenario || "Skill in progress")}</span>
-      <div class="meta-block">
-        <small>${escapeHtml(item.useWhen || "Review and refine this skill before making it reusable.")}</small>
-      </div>
-      <div class="action-row">
-        ${primaryButton}
-        <button type="button" data-action="delete-draft" data-id="${item.id}">Delete / 删除</button>
       </div>
     </article>
   `;
@@ -139,6 +120,7 @@ function renderSkill(item, variantsForSkill = []) {
         ${variantsForSkill.length ? variantsForSkill.map((variant) => `<small>${escapeHtml(variant.name)}</small>`).join("") : "<small>No variants yet.</small>"}
       </div>
       <div class="action-row">
+        <button type="button" data-action="edit-skill" data-id="${item.id}">Edit / 编辑</button>
         <button type="button" data-action="create-variant" data-id="${item.id}">Create Alternative / 新建优化版</button>
         <button type="button" data-action="delete-skill" data-id="${item.id}">Delete / 删除</button>
       </div>
@@ -155,10 +137,69 @@ function renderVariant(item, baseSkill) {
         <small>${escapeHtml(item.changeSummary || "Variant")}</small>
       </div>
       <div class="action-row">
+        <button type="button" data-action="edit-variant" data-id="${item.id}">Edit / 编辑</button>
         <button type="button" data-action="delete-variant" data-id="${item.id}">Delete / 删除</button>
       </div>
     </article>
   `;
+}
+
+function findLinkedDraftForConversation(conversationId) {
+  return latestState?.drafts?.find((draft) => (
+    (draft.status === "preview" || draft.status === "draft")
+      && (draft.sourceConversationIds || []).includes(conversationId)
+  )) || null;
+}
+
+async function ensureDraftFromConversation(conversationId) {
+  const linkedDraft = findLinkedDraftForConversation(conversationId);
+  if (linkedDraft) {
+    return linkedDraft;
+  }
+
+  const response = await chrome.runtime.sendMessage({
+    type: MESSAGE_TYPES.COMPILE_CONVERSATION,
+    payload: { conversationId }
+  });
+  await load();
+  return response?.result || null;
+}
+
+async function promoteConversationDirectly(conversationId) {
+  let draft = await ensureDraftFromConversation(conversationId);
+  if (!draft?.id) {
+    setFeedback("Could not generate a skill suggestion from this source.");
+    return;
+  }
+
+  if (draft.status === "preview") {
+    const approved = await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.APPROVE_DRAFT_PREVIEW,
+      payload: { draftId: draft.id }
+    });
+    draft = approved?.result || draft;
+  }
+
+  if (draft?.id) {
+    const promoted = await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.PROMOTE_DRAFT,
+      payload: { draftId: draft.id }
+    });
+    const skill = promoted?.result || null;
+    setFeedback(`Promoted to reusable skill / 已升级为正式技能: ${skill?.name || ""}`);
+    await load();
+  }
+}
+
+async function openConversationDraftDetail(conversationId) {
+  const draft = await ensureDraftFromConversation(conversationId);
+  if (!draft) {
+    setFeedback("Could not open a suggested skill for this source.");
+    return;
+  }
+
+  setFeedback("Suggested skill opened for editing.");
+  showDetailPanel(draft, "draft");
 }
 
 function showDetailPanel(item, kind) {
@@ -472,9 +513,13 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
-  if (action === "compile-conversation" && id) {
-    await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.COMPILE_CONVERSATION, payload: { conversationId: id } });
-    setFeedback("Inbox item compiled into preview.");
+  if (action === "promote-conversation" && id) {
+    await promoteConversationDirectly(id);
+    return;
+  }
+
+  if (action === "edit-conversation-draft" && id) {
+    await openConversationDraftDetail(id);
     return;
   }
 
@@ -492,10 +537,35 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
+  if (action === "edit-skill" && id) {
+    const item = latestState?.skills.find((skill) => skill.id === id);
+    if (item) {
+      showDetailPanel(item, "skill");
+    }
+    return;
+  }
+
   if (action === "delete-variant" && id) {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.DELETE_VARIANT, payload: { variantId: id } });
     setFeedback("Variant deleted.");
     hideDetailPanel();
+    return;
+  }
+
+  if (action === "edit-variant" && id) {
+    const item = latestState?.variants.find((variant) => variant.id === id);
+    if (item) {
+      showDetailPanel({
+        ...item,
+        scenario: item.scenarioOverride || "",
+        useWhen: "",
+        notFor: "",
+        goal: item.changeSummary || "",
+        outputFormat: "",
+        successCriteria: [],
+        steps: item.steps || []
+      }, "variant");
+    }
     return;
   }
 

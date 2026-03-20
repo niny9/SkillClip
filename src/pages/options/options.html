@@ -41,10 +41,6 @@
               <strong data-count="conversations">0</strong>
             </div>
             <div class="status-line">
-              <span>In progress skills / 处理中技能</span>
-              <strong data-count="in_progress">0</strong>
-            </div>
-            <div class="status-line">
               <span>Ready skills / 可复用技能</span>
               <strong data-count="skills">0</strong>
             </div>
@@ -64,9 +60,9 @@
             <summary>How To Use / 如何使用</summary>
             <div class="checklist">
               <p>1. 原始素材：你保存的 prompt 或整段对话原文。</p>
-              <p>2. 待确认技能：系统已经按 AI 或本地规则帮你整理过的一版草稿，还没算最终版。</p>
-              <p>3. 可复用技能：你确认通过后，才进入真正可复用区。</p>
-              <p>4. 同场景优化版本：同一个技能的第二版、第三版，由你手动创建和修改。</p>
+              <p>2. 可复用技能：系统会自动整理，你可以直接编辑，或者直接升级为正式技能。</p>
+              <p>3. 同场景优化版本：同一个技能的第二版、第三版，由你手动创建和修改。</p>
+              <p>4. 已归档：隐藏出主界面，但仍保留本地，可恢复。</p>
             </div>
           </details>
           <details class="guide-wrap">
@@ -86,11 +82,33 @@
         <p class="muted">
           Browse your saved items by stage instead of reading raw JSON. Use JSON only when you need backup or debugging.
         </p>
+        <div class="asset-filter-row">
+          <label class="field-label compact-field">
+            <span>View By / 查看维度</span>
+            <select data-asset-view>
+              <option value="stage">Stage / 按阶段</option>
+              <option value="platform">Platform / 按 AI 平台</option>
+              <option value="scenario">Scenario / 按场景</option>
+            </select>
+          </label>
+          <label class="field-label compact-field">
+            <span>Platform Filter / 平台筛选</span>
+            <select data-platform-filter>
+              <option value="all">All / 全部</option>
+            </select>
+          </label>
+          <label class="field-label compact-field">
+            <span>Scenario Filter / 场景筛选</span>
+            <select data-scenario-filter>
+              <option value="all">All / 全部</option>
+            </select>
+          </label>
+        </div>
         <div class="action-row">
           <button type="button" data-action="refresh-state">Refresh Snapshot</button>
           <button type="button" data-action="show-full-json">Show Full Snapshot / 显示全部快照</button>
-          <button type="button" data-action="copy-json">Copy JSON</button>
-          <button type="button" data-action="download-json">Download JSON</button>
+          <button type="button" data-action="copy-json">Copy Selected JSON / 复制当前 JSON</button>
+          <button type="button" data-action="download-json">Download Selected JSON / 下载当前 JSON</button>
         </div>
         <div class="asset-browser" data-asset-browser></div>
         <p class="muted" data-asset-feedback>Click an asset card to inspect only that item's JSON here.</p>
