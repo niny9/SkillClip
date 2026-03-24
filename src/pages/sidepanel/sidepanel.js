@@ -166,25 +166,41 @@ function getCurrentPlatformHint() {
 function renderConversation(item) {
   const linkedDraft = findLinkedDraftForConversation(item.id);
   const hasAutoDraft = Boolean(linkedDraft);
-  const pending = !hasAutoDraft;
-  const summaryText = linkedDraft?.useWhen || linkedDraft?.goal || linkedDraft?.scenario || "这条素材还没有整理出技能建议。";
+  const compileStatus = item.compileStatus || (hasAutoDraft ? "ready" : "idle");
+  const pending = compileStatus === "pending";
+  const failed = compileStatus === "failed";
+  const summaryText = failed
+    ? (item.compileError || "这条素材自动整理失败了，你可以手动重新生成。")
+    : linkedDraft?.useWhen || linkedDraft?.goal || linkedDraft?.scenario || "这条素材还没有整理出技能建议。";
   const directActionLabel = linkedDraft
     ? "Promote to Skill / 直接升级成技能"
     : "Generate Skill / 生成技能";
   const editButton = linkedDraft
     ? `<button type="button" data-action="edit-conversation-draft" data-id="${item.id}">Edit Suggestion / 编辑整理结果</button>`
     : "";
+  const badgeText = pending
+    ? "正在整理中 / 原始素材"
+    : failed
+      ? "整理失败 / 原始素材"
+      : "原始素材";
   return `
-    <article class="list-card clickable-card queue-card queue-card-raw ${pending ? "queue-card-pending" : ""}" data-detail-kind="conversation" data-detail-id="${item.id}">
+    <article class="list-card clickable-card queue-card queue-card-raw ${pending ? "queue-card-pending" : ""} ${failed ? "queue-card-failed" : ""}" data-detail-kind="conversation" data-detail-id="${item.id}">
       <strong>${escapeHtml(item.selectedText || item.sourceTitle || "Captured conversation")}</strong>
       <label class="inline-check">
         <input type="checkbox" data-select-conversation="${item.id}" ${selectedConversationIds.has(item.id) ? "checked" : ""} />
         <span>Select / 选择</span>
       </label>
-      <span class="queue-badge ${pending ? "queue-badge-pending" : ""}">${pending ? "正在整理中 / 原始素材" : "原始素材"}</span>
+      <span class="queue-badge ${pending ? "queue-badge-pending" : ""} ${failed ? "queue-badge-failed" : ""}">${badgeText}</span>
       <span>Source / 来源: ${escapeHtml(item.sourcePlatform || "other")} · Mode / 方式: ${escapeHtml(item.captureMode)}</span>
       <div class="meta-block">
-        <small>${hasAutoDraft ? `已自动整理：${escapeHtml(linkedDraft.status === "draft" ? "可编辑草稿" : "自动建议")}` : "系统还在整理这条素材，请稍等。"}</small>
+        <small>${hasAutoDraft
+          ? `已自动整理：${escapeHtml(linkedDraft.status === "draft" ? "可编辑草稿" : "自动建议")}`
+          : pending
+            ? "系统正在整理这条素材，请稍等。"
+            : failed
+              ? "这条素材自动整理失败了，你可以手动重新生成。"
+              : "这条素材还没有整理出技能建议。"
+        }</small>
         <small>${escapeHtml(summaryText)}</small>
       </div>
       <div class="action-row">
@@ -236,6 +252,13 @@ function renderVariant(item, baseSkill) {
 }
 
 function findLinkedDraftForConversation(conversationId) {
+  const conversation = latestState?.conversations?.find((item) => item.id === conversationId);
+  if (conversation?.linkedDraftId) {
+    const directLinked = latestState?.drafts?.find((draft) => draft.id === conversation.linkedDraftId);
+    if (directLinked) {
+      return directLinked;
+    }
+  }
   return latestState?.drafts?.find((draft) => (
     (draft.status === "preview" || draft.status === "draft")
       && (draft.sourceConversationIds || []).includes(conversationId)

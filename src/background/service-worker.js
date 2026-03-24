@@ -173,6 +173,9 @@ async function saveConversationMemory(payload, captureMode) {
     captureMode,
     selectedText: payload.selectedText || "",
     turns: payload.turns || [],
+    compileStatus: "idle",
+    compileError: "",
+    linkedDraftId: "",
     userTags: [],
     inferredTags: [],
     inferredScenario: payload.scenario || ""
@@ -189,10 +192,28 @@ async function saveCapturedItem(payload, captureMode) {
 
   let preview = null;
   if (settings.autoCompileAfterCapture) {
-    preview = await compileFromExistingMemory(memory, payload, settings);
+    await updateConversation(memory.id, (current) => ({
+      ...current,
+      compileStatus: "pending",
+      compileError: "",
+      updatedAt: nowIso()
+    }));
+    await broadcastStorageUpdate();
+    try {
+      preview = await compileFromExistingMemory(memory, payload, settings);
+    } catch (error) {
+      await updateConversation(memory.id, (current) => ({
+        ...current,
+        compileStatus: "failed",
+        compileError: error?.message || "自动编译失败",
+        updatedAt: nowIso()
+      }));
+      await broadcastStorageUpdate();
+      return { memory: await findConversationById(memory.id), preview: null };
+    }
   }
 
-  return { memory, preview };
+  return { memory: await findConversationById(memory.id), preview };
 }
 
 async function compileConversationToDraft(payload) {
@@ -209,14 +230,33 @@ async function compileStoredConversation(conversationId) {
   }
 
   const settings = await getSettings();
-  return compileFromExistingMemory(source, {
-    platform: source.sourcePlatform,
-    url: source.sourceUrl,
-    title: source.optimizedTitle || source.sourceTitle,
-    model: source.sourceModel,
-    selectedText: source.optimizedPrompt || source.selectedText || source.turns?.[0]?.text || "",
-    turns: applyOptimizedTurns(source) || source.turns || []
-  }, settings);
+  await updateConversation(conversationId, (current) => ({
+    ...current,
+    compileStatus: "pending",
+    compileError: "",
+    updatedAt: nowIso()
+  }));
+  await broadcastStorageUpdate();
+
+  try {
+    return await compileFromExistingMemory(source, {
+      platform: source.sourcePlatform,
+      url: source.sourceUrl,
+      title: source.optimizedTitle || source.sourceTitle,
+      model: source.sourceModel,
+      selectedText: source.optimizedPrompt || source.selectedText || source.turns?.[0]?.text || "",
+      turns: applyOptimizedTurns(source) || source.turns || []
+    }, settings);
+  } catch (error) {
+    await updateConversation(conversationId, (current) => ({
+      ...current,
+      compileStatus: "failed",
+      compileError: error?.message || "手动编译失败",
+      updatedAt: nowIso()
+    }));
+    await broadcastStorageUpdate();
+    throw error;
+  }
 }
 
 async function compileSelectedConversations(conversationIds) {
@@ -565,6 +605,13 @@ async function compileFromExistingMemory(memory, payload, settings) {
 
   draft = await applyApiValidationIfNeeded(draft, settings);
   await insertDraft(draft);
+  await updateConversation(memory.id, (current) => ({
+    ...current,
+    compileStatus: "ready",
+    compileError: "",
+    linkedDraftId: draft.id,
+    updatedAt: nowIso()
+  }));
   await broadcastStorageUpdate();
   return draft;
 }
