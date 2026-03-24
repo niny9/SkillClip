@@ -625,7 +625,7 @@ async function optimizeWorkflowPromptItem(payload) {
 }
 
 function rebuildAssetAfterWorkflowPromptEdit(asset, payload, settings) {
-  const workflowPrompts = (asset.workflowPrompts || []).map((item, index) => (
+  const nextWorkflowPrompts = (asset.workflowPrompts || []).map((item, index) => (
     index === payload.index
       ? {
         ...item,
@@ -638,9 +638,9 @@ function rebuildAssetAfterWorkflowPromptEdit(asset, payload, settings) {
       : item
   ));
 
-  const selectedText = workflowPrompts.map((item) => item.prompt).join("\n\n") || asset.example || "";
+  const selectedText = nextWorkflowPrompts.map((item) => item.prompt).join("\n\n") || asset.example || "";
   const rebuilt = buildSkillStructureFromWorkflowPrompts({
-    workflowPrompts,
+    workflowPrompts: nextWorkflowPrompts,
     scenario: asset.scenario || asset.scenarioOverride || "Reusable AI workflow",
     selectedText,
     payload: {
@@ -650,12 +650,13 @@ function rebuildAssetAfterWorkflowPromptEdit(asset, payload, settings) {
 
   const nextAsset = {
     ...asset,
-    workflowPrompts,
+    workflowPrompts: rebuilt.workflowPrompts,
     inputs: rebuilt.inputs,
     steps: rebuilt.steps,
     stepSources: rebuilt.stepSources,
     promptTemplate: rebuilt.promptTemplate,
     outputFormat: rebuilt.outputFormat,
+    example: selectedText,
     useWhen: asset.useWhen || rebuilt.useWhen,
     notFor: asset.notFor || rebuilt.notFor,
     goal: asset.goal || rebuilt.goal,

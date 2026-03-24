@@ -76,12 +76,12 @@
         <form data-prompt-form hidden>
           <input type="hidden" name="id" />
           <label class="field-label">
-            <span>Prompt Title / Prompt 标题</span>
+            <span data-source-title-label>Prompt Title / Prompt 标题</span>
             <input name="sourceTitle" type="text" />
           </label>
 
-          <label class="field-label">
-            <span>Prompt Content / Prompt 内容</span>
+          <label class="field-label" data-source-content-wrap>
+            <span data-source-content-label>Prompt Content / Prompt 内容</span>
             <textarea name="selectedText" rows="10"></textarea>
           </label>
 
@@ -96,8 +96,8 @@
           </section>
 
           <div class="action-row">
-            <button type="submit">保存 Prompt</button>
-            <button type="button" data-action="optimize-conversation">Optimize Prompt / 一键优化</button>
+            <button type="submit" data-source-save-button>保存 Prompt</button>
+            <button type="button" data-action="optimize-conversation" data-source-optimize-button>Optimize Prompt / 一键优化</button>
             <button type="button" data-action="clear-detail">关闭</button>
           </div>
         </form>

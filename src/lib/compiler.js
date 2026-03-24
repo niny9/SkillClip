@@ -587,13 +587,22 @@ function createStepsFromWorkflowPrompts(workflowPrompts = [], scenario = "") {
 
   return workflowPrompts.map((item, index) => {
     const title = item?.title || `步骤 ${index + 1}`;
+    const sections = parseStructuredPromptSections(item?.prompt || "");
+    const task = (sections.task || sections.body || "").replace(/\s+/g, " ").trim();
+    const compactTask = task
+      .replace(/^请你|请|需要你/g, "")
+      .replace(/[。.!！?？]+$/g, "")
+      .trim();
     if (scenario === "Podcast interview planning") {
       if (index === 0) {
-        return `明确访谈目标和核心话题：${title}`;
+        return compactTask ? `明确访谈目标和核心话题：${compactTask}` : `明确访谈目标和核心话题：${title}`;
       }
       if (index === workflowPrompts.length - 1) {
-        return `整理可直接使用的访谈输出：${title}`;
+        return compactTask ? `整理可直接使用的访谈输出：${compactTask}` : `整理可直接使用的访谈输出：${title}`;
       }
+    }
+    if (compactTask) {
+      return `${title}：${compactTask}`;
     }
     return `${title}：执行这一段优化后的工作流 Prompt。`;
   });

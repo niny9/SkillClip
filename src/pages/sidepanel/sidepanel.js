@@ -299,6 +299,11 @@ function showDetailPanel(item, kind) {
   const empty = document.querySelector("[data-detail-empty]");
   const title = document.querySelector("[data-detail-title]");
   const note = document.querySelector("[data-detail-note]");
+  const sourceTitleLabel = document.querySelector("[data-source-title-label]");
+  const sourceContentLabel = document.querySelector("[data-source-content-label]");
+  const sourceSaveButton = document.querySelector("[data-source-save-button]");
+  const sourceOptimizeButton = document.querySelector("[data-source-optimize-button]");
+  const sourceContentWrap = document.querySelector("[data-source-content-wrap]");
   if (!form || !empty || !promptForm) {
     return;
   }
@@ -332,19 +337,64 @@ function showDetailPanel(item, kind) {
         : "这是自动生成的技能草稿建议，升级成正式技能前建议先编辑。";
   }
   if (kind === "conversation") {
+    const linkedDraft = findLinkedDraftForConversation(item.id);
+    const isFlowCapture = item.captureMode === "whole_flow" || item.captureMode === "recent_turns";
+    const displayText = isFlowCapture
+      ? summarizeConversationForEditor(item)
+      : (item.selectedText || item.turns?.[0]?.text || "");
+
     promptForm.elements.id.value = item.id || "";
     promptForm.elements.sourceTitle.value = item.sourceTitle || "";
-    promptForm.elements.selectedText.value = item.selectedText || item.turns?.[0]?.text || "";
+    promptForm.elements.selectedText.value = displayText;
+    if (sourceTitleLabel) {
+      sourceTitleLabel.textContent = isFlowCapture ? "Flow Title / 工作流标题" : "Prompt Title / Prompt 标题";
+    }
+    if (sourceContentLabel) {
+      sourceContentLabel.textContent = isFlowCapture ? "Flow Content / 工作流内容" : "Prompt Content / Prompt 内容";
+    }
+    if (sourceSaveButton) {
+      sourceSaveButton.textContent = isFlowCapture ? "保存工作流原文" : "保存 Prompt";
+    }
+    if (sourceOptimizeButton) {
+      sourceOptimizeButton.textContent = isFlowCapture ? "整理这段工作流" : "Optimize Prompt / 一键优化";
+      sourceOptimizeButton.hidden = isFlowCapture;
+    }
+    if (sourceContentWrap) {
+      sourceContentWrap.classList.toggle("flow-source-wrap", isFlowCapture);
+    }
     renderPromptMeta(item);
-    renderOptimizedPrompt(item);
+    renderOptimizedPrompt(isFlowCapture ? null : item);
     renderExtractionPreview(null);
     renderValidationPreview(null);
     renderRunCheckPreview(null);
     renderStepMapPreview(null, item.turns || []);
+    renderWorkflowPromptsPreview(isFlowCapture ? (linkedDraft?.workflowPrompts || []) : []);
     renderVariantCompare(item, kind);
     renderSourcePreview(item);
+    if (note) {
+      note.hidden = false;
+      note.textContent = isFlowCapture
+        ? "这是你保存下来的整段工作流原文。下面优先展示系统整理出的工作流 Prompt，而不是单条 Prompt。"
+        : "原始素材只保留来源、标题和捕获内容。结构化字段只属于技能。";
+    }
     updateSupportingPanelVisibility();
     return;
+  }
+  if (sourceTitleLabel) {
+    sourceTitleLabel.textContent = "Prompt Title / Prompt 标题";
+  }
+  if (sourceContentLabel) {
+    sourceContentLabel.textContent = "Prompt Content / Prompt 内容";
+  }
+  if (sourceSaveButton) {
+    sourceSaveButton.textContent = "保存 Prompt";
+  }
+  if (sourceOptimizeButton) {
+    sourceOptimizeButton.textContent = "Optimize Prompt / 一键优化";
+    sourceOptimizeButton.hidden = false;
+  }
+  if (sourceContentWrap) {
+    sourceContentWrap.classList.remove("flow-source-wrap");
   }
   form.elements.id.value = item.id || "";
   form.elements.kind.value = kind;
@@ -482,7 +532,7 @@ function renderOptimizedPrompt(item) {
     return;
   }
 
-  if (!item.optimizedPrompt) {
+  if (!item?.optimizedPrompt) {
     panel.hidden = true;
     content.innerHTML = "";
     return;
@@ -498,6 +548,18 @@ function renderOptimizedPrompt(item) {
       </div>
     </article>
   `;
+}
+
+function summarizeConversationForEditor(item) {
+  const turns = Array.isArray(item?.turns) ? item.turns : [];
+  if (!turns.length) {
+    return item?.selectedText || "";
+  }
+
+  return turns
+    .map((turn, index) => `${index + 1}. ${turn.role === "assistant" ? "AI" : "用户"}：${turn.text || ""}`)
+    .join("\n\n")
+    .slice(0, 5000);
 }
 
 function renderWorkflowPromptsPreview(items) {
