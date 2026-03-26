@@ -614,7 +614,7 @@ function inferStepSources(turns = [], steps = [], scenario = "") {
   return steps.map((step) => buildStepSourceMatch(step, turns, 2));
 }
 
-function createStepsFromWorkflowPrompts(workflowPrompts = [], scenario = "") {
+export function createStepsFromWorkflowPrompts(workflowPrompts = [], scenario = "") {
   if (!Array.isArray(workflowPrompts) || workflowPrompts.length === 0) {
     return [];
   }
