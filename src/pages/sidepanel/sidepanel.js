@@ -42,11 +42,95 @@ function updateSupportingPanelVisibility() {
   wrapper.hidden = !hasVisibleChild;
 }
 
+function renderWorkflowStatus() {
+  const wrapper = document.querySelector("[data-workflow-status]");
+  const title = document.querySelector("[data-workflow-status-title]");
+  const text = document.querySelector("[data-workflow-status-text]");
+  if (!(wrapper instanceof HTMLElement) || !title || !text) {
+    return;
+  }
+
+  const asset = getCurrentDetailAsset();
+  if (!asset || selectedDetail?.kind === "conversation" || !Array.isArray(asset.workflowPrompts) || !asset.workflowPrompts.length) {
+    wrapper.hidden = true;
+    title.textContent = "当前还没有选中工作流步骤";
+    text.textContent = "点开某条工作流 Prompt 或步骤后，这里会显示当前对照关系。";
+    return;
+  }
+
+  wrapper.hidden = false;
+  if (!selectedWorkflowPrompt || !Number.isInteger(selectedWorkflowPrompt.index)) {
+    title.textContent = "当前正在查看整条工作流";
+    text.textContent = `这条技能目前共有 ${asset.workflowPrompts.length} 条工作流 Prompt 和 ${asset.steps?.length || 0} 个步骤。`;
+    return;
+  }
+
+  const index = selectedWorkflowPrompt.index;
+  const prompt = asset.workflowPrompts[index];
+  const step = asset.stepSources?.[index]?.step || asset.steps?.[index] || "";
+  title.textContent = `当前选中：第 ${index + 1} 条 Prompt / 第 ${index + 1} 步`;
+  text.textContent = `${prompt?.title || "未命名工作流 Prompt"} -> ${step || "还没有步骤内容"}`;
+}
+
+function renderRunbookPrimary(item) {
+  const panel = document.querySelector("[data-runbook-primary-panel]");
+  const content = document.querySelector("[data-runbook-primary-content]");
+  if (!(panel instanceof HTMLElement) || !content) {
+    return;
+  }
+
+  if (!item || !item.promptTemplate || selectedDetail?.kind === "conversation") {
+    panel.hidden = true;
+    content.innerHTML = "";
+    return;
+  }
+
+  panel.hidden = false;
+  content.innerHTML = `
+    <article class="list-card workflow-runbook-card">
+      <strong>完整运行手册</strong>
+      <span>这一段是最终可直接交给 AI 执行的完整技能文本。</span>
+      <pre class="runbook-preview">${escapeHtml(item.promptTemplate)}</pre>
+    </article>
+  `;
+}
+
 function setFeedback(message) {
   const node = document.querySelector("[data-feedback]");
   if (node) {
     node.textContent = message;
   }
+}
+
+function renderSkillOverview(item, kind) {
+  const panel = document.querySelector("[data-skill-overview-panel]");
+  const content = document.querySelector("[data-skill-overview-content]");
+  if (!(panel instanceof HTMLElement) || !content) {
+    return;
+  }
+
+  if (!item || kind === "conversation") {
+    panel.hidden = true;
+    content.innerHTML = "";
+    return;
+  }
+
+  const cards = [
+    ["使用场景", item.scenario || item.scenarioOverride || "待补充"],
+    ["适用场景", item.useWhen || "待补充"],
+    ["不适用", item.notFor || "待补充"],
+    ["目标", item.goal || item.changeSummary || "待补充"],
+    ["输出格式", item.outputFormat || "待补充"],
+    ["成功标准", Array.isArray(item.successCriteria) && item.successCriteria.length ? item.successCriteria.join("；") : "待补充"]
+  ];
+
+  panel.hidden = false;
+  content.innerHTML = cards.map(([label, value]) => `
+    <article class="list-card skill-overview-card">
+      <strong>${escapeHtml(label)}</strong>
+      <span>${escapeHtml(value)}</span>
+    </article>
+  `).join("");
 }
 
 async function sendToActiveTab(message) {
@@ -89,7 +173,7 @@ async function applySkillToActiveTab(skill) {
         type: MESSAGE_TYPES.INSERT_SKILL,
         payload: { skillId: skill.id }
       });
-      setFeedback(`已把技能应用到当前输入框：${skill.name}`);
+      setFeedback(`已把技能插入当前输入框：${skill.name}`);
     } else {
       setFeedback("当前页面应用这个技能失败，请确认输入框已聚焦。");
     }
@@ -173,10 +257,10 @@ function renderConversation(item) {
     ? (item.compileError || "这条素材自动整理失败了，你可以手动重新生成。")
     : linkedDraft?.useWhen || linkedDraft?.goal || linkedDraft?.scenario || "这条素材还没有整理出技能建议。";
   const directActionLabel = linkedDraft
-    ? "Promote to Skill / 直接升级成技能"
-    : "Generate Skill / 生成技能";
+    ? "直接升级成技能"
+    : "生成技能";
   const editButton = linkedDraft
-    ? `<button type="button" data-action="edit-conversation-draft" data-id="${item.id}">Edit Suggestion / 编辑整理结果</button>`
+    ? `<button type="button" data-action="edit-conversation-draft" data-id="${item.id}">编辑整理结果</button>`
     : "";
   const badgeText = pending
     ? "正在整理中 / 原始素材"
@@ -185,13 +269,13 @@ function renderConversation(item) {
       : "原始素材";
   return `
     <article class="list-card clickable-card queue-card queue-card-raw ${pending ? "queue-card-pending" : ""} ${failed ? "queue-card-failed" : ""}" data-detail-kind="conversation" data-detail-id="${item.id}">
-      <strong>${escapeHtml(item.selectedText || item.sourceTitle || "Captured conversation")}</strong>
+      <strong>${escapeHtml(item.selectedText || item.sourceTitle || "原始对话")}</strong>
       <label class="inline-check">
         <input type="checkbox" data-select-conversation="${item.id}" ${selectedConversationIds.has(item.id) ? "checked" : ""} />
-        <span>Select / 选择</span>
+        <span>选择</span>
       </label>
       <span class="queue-badge ${pending ? "queue-badge-pending" : ""} ${failed ? "queue-badge-failed" : ""}">${badgeText}</span>
-      <span>Source / 来源: ${escapeHtml(item.sourcePlatform || "other")} · Mode / 方式: ${escapeHtml(item.captureMode)}</span>
+      <span>来源：${escapeHtml(item.sourcePlatform || "other")} · 保存方式：${escapeHtml(item.captureMode)}</span>
       <div class="meta-block">
         <small>${hasAutoDraft
           ? `已自动整理：${escapeHtml(linkedDraft.status === "draft" ? "可编辑草稿" : "自动建议")}`
@@ -219,13 +303,13 @@ function renderSkill(item, variantsForSkill = []) {
       <strong>${escapeHtml(item.name)}</strong>
       <span>可复用技能 · ${escapeHtml(item.scenario || "可复用工作流")} · 已使用 ${item.usageCount || 0} 次</span>
       <div class="meta-block">
-        ${platforms ? `<small>Platforms / 平台: ${escapeHtml(platforms)}</small>` : ""}
-        <small>Variants / 变体数: ${variantsForSkill.length}</small>
+        ${platforms ? `<small>适用平台：${escapeHtml(platforms)}</small>` : ""}
+        <small>优化版本数：${variantsForSkill.length}</small>
         ${variantsForSkill.length ? variantsForSkill.map((variant) => `<small>${escapeHtml(variant.name)}</small>`).join("") : "<small>还没有优化版本。</small>"}
       </div>
       <div class="action-row">
         <button type="button" data-action="edit-skill" data-id="${item.id}">编辑</button>
-        <button type="button" data-action="apply-skill" data-id="${item.id}">Apply Now / 立即应用</button>
+        <button type="button" data-action="apply-skill" data-id="${item.id}">立即应用</button>
         <button type="button" data-action="create-variant" data-id="${item.id}">新建优化版</button>
         <button type="button" data-action="delete-skill" data-id="${item.id}">删除</button>
       </div>
@@ -240,8 +324,8 @@ function renderVariant(item, baseSkill) {
       <strong>${escapeHtml(item.name)}</strong>
       <span>同场景优化版本 · 所属技能：${escapeHtml(baseSkill?.name || item.baseSkillId)}</span>
       <div class="meta-block">
-        ${platforms ? `<small>Platforms / 平台: ${escapeHtml(platforms)}</small>` : ""}
-        <small>${escapeHtml(item.changeSummary || "Variant")}</small>
+        ${platforms ? `<small>适用平台：${escapeHtml(platforms)}</small>` : ""}
+        <small>${escapeHtml(item.changeSummary || "还没有填写优化重点。")}</small>
       </div>
       <div class="action-row">
         <button type="button" data-action="edit-variant" data-id="${item.id}">编辑</button>
@@ -370,16 +454,16 @@ function showDetailPanel(item, kind) {
     promptForm.elements.sourceTitle.value = item.sourceTitle || "";
     promptForm.elements.selectedText.value = displayText;
     if (sourceTitleLabel) {
-      sourceTitleLabel.textContent = isFlowCapture ? "Flow Title / 工作流标题" : "Prompt Title / Prompt 标题";
+      sourceTitleLabel.textContent = isFlowCapture ? "工作流标题" : "Prompt 标题";
     }
     if (sourceContentLabel) {
-      sourceContentLabel.textContent = isFlowCapture ? "Flow Content / 工作流内容" : "Prompt Content / Prompt 内容";
+      sourceContentLabel.textContent = isFlowCapture ? "工作流内容" : "Prompt 内容";
     }
     if (sourceSaveButton) {
       sourceSaveButton.textContent = isFlowCapture ? "保存工作流原文" : "保存 Prompt";
     }
     if (sourceOptimizeButton) {
-      sourceOptimizeButton.textContent = isFlowCapture ? "整理这段工作流" : "Optimize Prompt / 一键优化";
+      sourceOptimizeButton.textContent = isFlowCapture ? "整理这段工作流" : "一键优化 Prompt";
       sourceOptimizeButton.hidden = isFlowCapture;
     }
     if (sourceContentWrap) {
@@ -394,6 +478,10 @@ function showDetailPanel(item, kind) {
     renderWorkflowPromptsPreview(isFlowCapture ? (linkedDraft?.workflowPrompts || []) : []);
     renderVariantCompare(item, kind);
     renderSourcePreview(item);
+    renderSkillOverview(null, kind);
+    renderWorkflowAlignment();
+    renderRunbookPrimary(linkedDraft);
+    renderWorkflowStatus();
     if (note) {
       note.hidden = false;
       note.textContent = isFlowCapture
@@ -404,16 +492,16 @@ function showDetailPanel(item, kind) {
     return;
   }
   if (sourceTitleLabel) {
-    sourceTitleLabel.textContent = "Prompt Title / Prompt 标题";
+    sourceTitleLabel.textContent = "Prompt 标题";
   }
   if (sourceContentLabel) {
-    sourceContentLabel.textContent = "Prompt Content / Prompt 内容";
+    sourceContentLabel.textContent = "Prompt 内容";
   }
   if (sourceSaveButton) {
     sourceSaveButton.textContent = "保存 Prompt";
   }
   if (sourceOptimizeButton) {
-    sourceOptimizeButton.textContent = "Optimize Prompt / 一键优化";
+    sourceOptimizeButton.textContent = "一键优化 Prompt";
     sourceOptimizeButton.hidden = false;
   }
   if (sourceContentWrap) {
@@ -437,6 +525,10 @@ function showDetailPanel(item, kind) {
   renderWorkflowPromptsPreview(item.workflowPrompts || []);
   renderVariantCompare(item, kind);
   renderSourcePreview(item);
+  renderSkillOverview(item, kind);
+  renderWorkflowAlignment();
+  renderRunbookPrimary(item);
+  renderWorkflowStatus();
   updateSupportingPanelVisibility();
 }
 
@@ -465,6 +557,10 @@ function hideDetailPanel() {
   const workflowPromptCheck = document.querySelector("[data-workflow-prompt-check]");
   const comparePanel = document.querySelector("[data-compare-panel]");
   const compareContent = document.querySelector("[data-compare-content]");
+  const runbookPrimaryPanel = document.querySelector("[data-runbook-primary-panel]");
+  const runbookPrimaryContent = document.querySelector("[data-runbook-primary-content]");
+  const skillOverviewPanel = document.querySelector("[data-skill-overview-panel]");
+  const skillOverviewContent = document.querySelector("[data-skill-overview-content]");
   const title = document.querySelector("[data-detail-title]");
   const note = document.querySelector("[data-detail-note]");
   if (!form || !empty || !promptForm) {
@@ -545,6 +641,22 @@ function hideDetailPanel() {
   if (compareContent) {
     compareContent.innerHTML = "";
   }
+  if (runbookPrimaryPanel) {
+    runbookPrimaryPanel.hidden = true;
+  }
+  if (runbookPrimaryContent) {
+    runbookPrimaryContent.innerHTML = "";
+  }
+  if (skillOverviewPanel) {
+    skillOverviewPanel.hidden = true;
+  }
+  if (skillOverviewContent) {
+    skillOverviewContent.innerHTML = "";
+  }
+  renderWorkflowAlignment();
+  renderRunbookPrimary(null);
+  renderSkillOverview(null, null);
+  renderWorkflowStatus();
   updateSupportingPanelVisibility();
 }
 
@@ -600,8 +712,9 @@ function renderWorkflowPromptsPreview(items) {
 
   panel.hidden = false;
   content.innerHTML = items.map((item, index) => `
-    <article class="list-card">
-      <strong>第 ${index + 1} 条 · ${escapeHtml(item.title || `工作流 Prompt ${index + 1}`)}</strong>
+    <article class="list-card workflow-card ${selectedWorkflowPrompt?.index === index ? "linked-focus-card" : ""}" data-workflow-index="${index}">
+      <strong>第 ${index + 1} 条 · ${escapeHtml(item.title || `工作流步骤 ${index + 1}`)}</strong>
+      <span>这一条对应工作流中的第 ${index + 1} 步，标题应该描述“要完成的动作”。</span>
       <span>${escapeHtml(item.prompt || "")}</span>
       <div class="meta-block">
         <small>对应步骤：第 ${index + 1} 步</small>
@@ -611,11 +724,13 @@ function renderWorkflowPromptsPreview(items) {
       <div class="action-row">
         <button type="button" data-action="edit-workflow-prompt" data-index="${index}">编辑</button>
         <button type="button" data-action="optimize-workflow-prompt-inline" data-index="${index}">一键优化</button>
-        <button type="button" data-action="run-workflow-prompt-check" data-index="${index}">检查这条 Prompt</button>
+        <button type="button" data-action="run-workflow-prompt-check" data-index="${index}">检查这条工作流 Prompt</button>
+        <button type="button" data-action="focus-workflow-step" data-index="${index}">查看对应步骤</button>
       </div>
       ${item.sourceTurnIds?.length ? `<div class="action-row">${item.sourceTurnIds.map((turnId) => `<button type="button" data-action="jump-to-turn" data-turn-id="${escapeHtml(turnId)}">定位到 ${escapeHtml(turnId)}</button>`).join("")}</div>` : ""}
     </article>
   `).join("");
+  renderWorkflowStatus();
 }
 
 function renderWorkflowPromptEditor(item, index, promptCheck = null) {
@@ -642,7 +757,7 @@ function renderWorkflowPromptEditor(item, index, promptCheck = null) {
   checkNode.innerHTML = promptCheck
     ? `
       <article class="list-card ${promptCheck.running ? "status-running" : ""}">
-        <strong>${escapeHtml(promptCheck.running ? "正在检查这条 Prompt..." : promptCheck.ok ? "这条 Prompt 可以使用" : "这条 Prompt 还需要继续优化")}</strong>
+        <strong>${escapeHtml(promptCheck.running ? "正在检查这条工作流 Prompt..." : promptCheck.ok ? "这条工作流 Prompt 可以使用" : "这条工作流 Prompt 还需要继续优化")}</strong>
         <span>${escapeHtml(promptCheck.summary || "")}</span>
         ${(Array.isArray(promptCheck.issues) && promptCheck.issues.length)
           ? `<div class="meta-block"><small>${escapeHtml(promptCheck.issues.join(" | "))}</small></div>`
@@ -658,8 +773,9 @@ function renderWorkflowPromptEditor(item, index, promptCheck = null) {
       </div>
       ${(item.previousPrompt || item.previousTitle)
         ? `<details class="raw-json-wrap"><summary>上一版本</summary><div class="meta-block"><small>${escapeHtml(item.previousTitle || "")}</small><small>${escapeHtml(item.previousPrompt || "")}</small></div></details>`
-        : "<p class='muted'>你可以在这里编辑单条工作流 Prompt，然后保存或单独检查。</p>"}
+        : "<p class='muted'>你可以在这里编辑单条工作流 Prompt，然后保存、优化或单独检查。</p>"}
     `;
+  renderWorkflowStatus();
 }
 
 function renderRunCheckPreview(result) {
@@ -682,11 +798,11 @@ function renderRunCheckPreview(result) {
   const promptChecks = Array.isArray(result.promptChecks) && result.promptChecks.length
     ? `
       <div class="meta-block">
-        <small>工作流 Prompt 检查</small>
+        <small>工作流 Prompt 检查结果</small>
       </div>
       ${result.promptChecks.map((item, index) => `
         <article class="list-card">
-          <strong>Prompt ${index + 1} · ${escapeHtml(item.title || `Prompt ${index + 1}`)}</strong>
+          <strong>第 ${index + 1} 条 · ${escapeHtml(item.title || `工作流 Prompt ${index + 1}`)}</strong>
           <span>${escapeHtml(item.ok ? "可用" : "还需要继续优化")}</span>
           <div class="meta-block">
             <small>${escapeHtml(item.summary || "")}</small>
@@ -731,16 +847,92 @@ function renderStepMapPreview(stepSources, fallbackItems = []) {
         ${fallbackItems.map((item, index) => `<li>${index + 1}. ${escapeHtml(item.text || item)}</li>`).join("")}
       </ul>
     `;
+    renderWorkflowAlignment();
+    renderWorkflowStatus();
     return;
   }
 
   panel.hidden = false;
+  const currentAsset = getCurrentDetailAsset();
+  const workflowPrompts = currentAsset?.workflowPrompts || [];
   content.innerHTML = stepSources.map((item, index) => `
-    <article class="list-card">
+    <article class="list-card workflow-step-card ${selectedWorkflowPrompt?.index === index ? "linked-focus-card" : ""}" data-step-index="${index}">
       <strong>第 ${index + 1} 步</strong>
       <span>${escapeHtml(item.step || "")}</span>
-      ${item.sourceTurnIds?.length ? `<div class="action-row">${item.sourceTurnIds.map((turnId) => `<button type="button" data-action="jump-to-turn" data-turn-id="${escapeHtml(turnId)}">定位到 ${escapeHtml(turnId)}</button>`).join("")}</div>` : ""}
+      ${workflowPrompts[index]?.title ? `<div class="meta-block"><small>对应工作流 Prompt</small><small>${escapeHtml(workflowPrompts[index].title)}</small></div>` : ""}
+      <div class="action-row">
+        <button type="button" data-action="focus-workflow-prompt" data-index="${index}">查看对应 Prompt</button>
+        ${item.sourceTurnIds?.length ? item.sourceTurnIds.map((turnId) => `<button type="button" data-action="jump-to-turn" data-turn-id="${escapeHtml(turnId)}">定位到 ${escapeHtml(turnId)}</button>`).join("") : ""}
+      </div>
       ${item.sourcePreview ? `<div class="meta-block"><small>来源摘要</small><small>${escapeHtml(item.sourcePreview)}</small></div>` : ""}
+    </article>
+  `).join("");
+  renderWorkflowAlignment();
+  renderWorkflowStatus();
+}
+
+function focusWorkflowIndex(index) {
+  if (!Number.isInteger(index) || index < 0) {
+    return;
+  }
+
+  selectedWorkflowPrompt = { index };
+  const asset = getCurrentDetailAsset();
+  if (asset && selectedDetail && selectedDetail.kind !== "conversation") {
+    renderWorkflowPromptsPreview(asset.workflowPrompts || []);
+    renderStepMapPreview(asset.stepSources || [], asset.steps || []);
+    renderWorkflowAlignment();
+    renderWorkflowStatus();
+  }
+
+  requestAnimationFrame(() => {
+    const promptNode = document.querySelector(`[data-workflow-index="${CSS.escape(String(index))}"]`);
+    const stepNode = document.querySelector(`[data-step-index="${CSS.escape(String(index))}"]`);
+    promptNode?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    stepNode?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+}
+
+function renderWorkflowAlignment() {
+  const panel = document.querySelector("[data-workflow-alignment-panel]");
+  const content = document.querySelector("[data-workflow-alignment-content]");
+  if (!(panel instanceof HTMLElement) || !content) {
+    return;
+  }
+
+  const asset = getCurrentDetailAsset();
+  if (!asset || selectedDetail?.kind === "conversation" || !Array.isArray(asset.workflowPrompts) || !asset.workflowPrompts.length) {
+    panel.hidden = true;
+    content.innerHTML = "";
+    return;
+  }
+
+  const prompts = asset.workflowPrompts || [];
+  const steps = asset.stepSources || [];
+  panel.hidden = false;
+  content.innerHTML = prompts.map((prompt, index) => `
+    <article class="list-card workflow-alignment-row ${selectedWorkflowPrompt?.index === index ? "linked-focus-card" : ""}">
+      <div class="workflow-alignment-col">
+        <strong>工作流 Prompt ${index + 1}</strong>
+        <span>${escapeHtml(prompt.title || `工作流 Prompt ${index + 1}`)}</span>
+        <div class="meta-block">
+          <small>${escapeHtml(prompt.prompt || "")}</small>
+        </div>
+        <div class="action-row">
+          <button type="button" data-action="edit-workflow-prompt" data-index="${index}">编辑</button>
+          <button type="button" data-action="focus-workflow-step" data-index="${index}">查看对应步骤</button>
+        </div>
+      </div>
+      <div class="workflow-alignment-col">
+        <strong>执行步骤 ${index + 1}</strong>
+        <span>${escapeHtml(steps[index]?.step || asset.steps?.[index] || "还没有这一步的说明")}</span>
+        <div class="meta-block">
+          <small>${escapeHtml(steps[index]?.sourcePreview || "这一步还没有来源摘要。")}</small>
+        </div>
+        <div class="action-row">
+          <button type="button" data-action="focus-workflow-prompt" data-index="${index}">查看对应 Prompt</button>
+        </div>
+      </div>
     </article>
   `).join("");
 }
@@ -753,10 +945,10 @@ function renderPromptMeta(item) {
 
   container.innerHTML = `
     <div class="meta-block">
-      <small>Platform / 平台: ${escapeHtml(item.sourcePlatform || "other")}</small>
-      <small>Mode / 方式: ${escapeHtml(item.captureMode || "selection")}</small>
-      <small>URL / 链接: ${escapeHtml(item.sourceUrl || "")}</small>
-      <small>Turns / 对话轮次: ${escapeHtml(String(item.turns?.length || 0))}</small>
+      <small>平台：${escapeHtml(item.sourcePlatform || "other")}</small>
+      <small>方式：${escapeHtml(item.captureMode || "selection")}</small>
+      <small>链接：${escapeHtml(item.sourceUrl || "")}</small>
+      <small>对话轮次：${escapeHtml(String(item.turns?.length || 0))}</small>
     </div>
   `;
 }
@@ -782,17 +974,17 @@ function renderExtractionPreview(extraction) {
 
   if (!extraction) {
     panel.hidden = false;
-    content.innerHTML = "<p class='muted'>Local heuristic extraction / 本地规则抽取</p>";
+    content.innerHTML = "<p class='muted'>当前使用：本地规则抽取</p>";
     return;
   }
 
   panel.hidden = false;
   content.innerHTML = `
     <div class="meta-block">
-      <small>Mode / 模式: ${escapeHtml(extraction.mode || "unknown")}</small>
-      <small>Provider / 服务商: ${escapeHtml(extraction.provider || "local")}</small>
-      <small>Model / 模型: ${escapeHtml(extraction.model || "heuristic")}</small>
-      <small>Extracted At / 抽取时间: ${escapeHtml(extraction.extractedAt || "")}</small>
+      <small>模式：${escapeHtml(extraction.mode || "unknown")}</small>
+      <small>服务商：${escapeHtml(extraction.provider || "local")}</small>
+      <small>模型：${escapeHtml(extraction.model || "heuristic")}</small>
+      <small>抽取时间：${escapeHtml(extraction.extractedAt || "")}</small>
     </div>
   `;
 }
@@ -806,7 +998,7 @@ function renderValidationPreview(validation) {
 
   if (!validation) {
     panel.hidden = false;
-    content.innerHTML = "<p class='muted'>This check runs automatically when a preview is generated, when you save edits, and when a draft is promoted to a reusable skill.</p>";
+    content.innerHTML = "<p class='muted'>系统会在生成技能、保存编辑、升级为可复用技能时自动做检查。</p>";
     return;
   }
 
@@ -853,14 +1045,14 @@ function renderVariantCompare(item, kind) {
   panel.hidden = false;
   content.innerHTML = `
     <article class="list-card">
-      <strong>${escapeHtml(baseSkill.name || "Base skill")}</strong>
+      <strong>${escapeHtml(baseSkill.name || "基础技能")}</strong>
       <span>${escapeHtml(baseSkill.scenario || "暂未填写场景")}</span>
       <div class="meta-block">
-        <small>Base prompt / 基础模板</small>
+        <small>基础模板</small>
         <small>${escapeHtml((baseSkill.promptTemplate || "").slice(0, 220) || "暂时还没有运行手册")}</small>
       </div>
       <div class="meta-block">
-        <small>Your variant focus / 你的优化点</small>
+        <small>当前优化重点</small>
         <small>${escapeHtml(item.changeSummary || "暂时还没有填写优化重点。")}</small>
       </div>
     </article>
@@ -914,12 +1106,12 @@ function renderSourceCard(source) {
   return `
     <article class="list-card source-card">
       <strong>${escapeHtml(source.sourceTitle || source.selectedText || "原始对话")}</strong>
-      <span>Platform / 平台: ${escapeHtml(source.sourcePlatform || "other")}</span>
-      <span>Mode / 方式: ${escapeHtml(source.captureMode || "unknown")}</span>
-      ${source.selectedText ? `<div class="meta-block"><small>Selected text / 选中文本</small><small>${escapeHtml(source.selectedText.slice(0, 180))}</small></div>` : ""}
+      <span>平台：${escapeHtml(source.sourcePlatform || "other")}</span>
+      <span>方式：${escapeHtml(source.captureMode || "unknown")}</span>
+      ${source.selectedText ? `<div class="meta-block"><small>选中文本</small><small>${escapeHtml(source.selectedText.slice(0, 180))}</small></div>` : ""}
       <details class="raw-json-wrap">
         <summary>查看完整来源时间线</summary>
-        <div class="meta-block"><small>URL</small><small>${escapeHtml(source.sourceUrl || "")}</small></div>
+        <div class="meta-block"><small>来源链接</small><small>${escapeHtml(source.sourceUrl || "")}</small></div>
         ${turnsPreview ? `<div class="source-turns"><small>对话时间线</small>${turnsPreview}</div>` : ""}
       </details>
       <div class="action-row">
@@ -1099,8 +1291,23 @@ document.addEventListener("click", async (event) => {
       setFeedback("没有找到这条工作流 Prompt。");
       return;
     }
+    focusWorkflowIndex(index);
     renderWorkflowPromptEditor(prompt, index);
     setFeedback("已打开这条工作流 Prompt，准备编辑。");
+    return;
+  }
+
+  if (action === "focus-workflow-step") {
+    const index = Number(target.dataset.index);
+    focusWorkflowIndex(index);
+    setFeedback(`已定位到第 ${index + 1} 步。`);
+    return;
+  }
+
+  if (action === "focus-workflow-prompt") {
+    const index = Number(target.dataset.index);
+    focusWorkflowIndex(index);
+    setFeedback(`已定位到第 ${index + 1} 条工作流 Prompt。`);
     return;
   }
 
@@ -1172,6 +1379,7 @@ document.addEventListener("click", async (event) => {
       showDetailPanel(nextAsset, selectedDetail.kind);
     }
     if (nextPrompt) {
+      focusWorkflowIndex(index);
       renderWorkflowPromptEditor(nextPrompt, index, {
         ok: true,
         summary: "这条工作流 Prompt 已优化完成。",
@@ -1216,6 +1424,7 @@ document.addEventListener("click", async (event) => {
       showDetailPanel(nextAsset, selectedDetail.kind);
     }
     if (nextPrompt) {
+      focusWorkflowIndex(index);
       renderWorkflowPromptEditor(nextPrompt, index, response?.result ? {
         ok: true,
         summary: "这条工作流 Prompt 已优化完成。",

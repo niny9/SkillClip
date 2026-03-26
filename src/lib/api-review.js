@@ -1,3 +1,4 @@
+import { createStepsFromWorkflowPrompts } from "./compiler.js";
 import { nowIso } from "./utils.js";
 
 export async function extractSkillDraftWithApi(payload, fallbackDraft, settings) {
@@ -33,6 +34,8 @@ export async function extractSkillDraftWithApi(payload, fallbackDraft, settings)
             "workflowPrompts must be an array of { title, prompt, sourceTurnIds } with concise optimized prompts.",
             "Each workflow prompt should read like a high-quality reusable prompt, not copied chat text.",
             "workflowPrompts should correspond to the meaningful user turns in order whenever possible.",
+            "workflow prompt titles must be complete, natural Chinese action titles, not truncated fragments.",
+            "steps should describe the execution workflow for the user or operator, not say 'execute this prompt'.",
             "steps should align with workflowPrompts instead of repeating the raw chat.",
             "promptTemplate must be a structured Markdown runbook with sections such as IDENTITY and PURPOSE, INPUTS, STEPS, and OUTPUT INSTRUCTIONS.",
             "steps must be an array of short strings.",
@@ -96,7 +99,7 @@ function normalizeWorkflowPrompts(items, fallback = []) {
 
   return items
     .map((item, index) => ({
-      title: String(item?.title || `步骤提示词 ${index + 1}`).trim(),
+      title: String(item?.title || `继续完成这条工作流的第 ${index + 1} 步`).trim(),
       prompt: String(item?.prompt || "").trim(),
       sourceTurnIds: Array.isArray(item?.sourceTurnIds)
         ? item.sourceTurnIds.map((id) => String(id)).filter(Boolean)
@@ -111,7 +114,7 @@ function normalizeSteps(items, workflowPrompts = [], fallback = []) {
   }
 
   if (workflowPrompts.length) {
-    return workflowPrompts.map((item) => `${item.title}：执行这一段优化后的工作流 Prompt。`);
+    return createStepsFromWorkflowPrompts(workflowPrompts, "");
   }
 
   return fallback || [];

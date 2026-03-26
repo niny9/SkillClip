@@ -9,12 +9,12 @@
   <body>
     <main class="page-shell page-shell-workspace">
       <section>
-        <p class="eyebrow">Workspace</p>
-        <h1>Workspace / 工作台</h1>
+        <p class="eyebrow">工作台 Workspace</p>
+        <h1>工作台</h1>
         <p class="lede">保存 Prompt 或 Whole Flow 后，会先进入待整理队列。你确认后，它才会变成可复用技能；优化版用于同场景下的第二版、第三版。</p>
 
         <section class="card">
-          <h2>Flow / 当前流程</h2>
+          <h2>当前流程</h2>
           <div class="checklist">
             <p>1. 原始素材：你刚保存下来的原文或对话。</p>
             <p>2. 可复用技能：原始素材会自动整理，你可以直接编辑，或直接升级成正式技能。</p>
@@ -41,11 +41,11 @@
         </section>
 
         <section class="card">
-          <h2>Raw Captures / 原始素材</h2>
+          <h2>原始素材</h2>
           <p class="muted">这里是你保存下来的原始内容。系统会自动整理一版建议；你可以直接编辑，或者直接升级为正式技能。</p>
           <div class="action-row">
             <button type="button" data-action="compile-selected">把选中的 Prompt 合并成一个技能</button>
-            <span class="muted" data-selected-count>已选择: 0</span>
+            <span class="muted" data-selected-count>已选择：0</span>
           </div>
           <div data-queue-raw class="stack"></div>
         </section>
@@ -57,7 +57,7 @@
         </section>
 
         <section class="card">
-          <h2>Variants / 同场景优化版本</h2>
+          <h2>同场景优化版本</h2>
           <p class="muted">这里放的是你手动为同一 skill 分出来的另一版，用于比较和优化。</p>
           <div data-variants class="stack"></div>
         </section>
@@ -73,20 +73,28 @@
         <p class="muted" data-detail-note hidden>
           这些内容是 AI 或本地规则自动生成的草稿建议，正式使用前请先编辑确认。
         </p>
+        <section class="card skill-overview-panel" data-skill-overview-panel hidden>
+          <h3>技能摘要</h3>
+          <div class="skill-overview-grid" data-skill-overview-content></div>
+        </section>
+        <section class="status-line workflow-status-line" data-workflow-status hidden>
+          <strong data-workflow-status-title>当前还没有选中工作流步骤</strong>
+          <span data-workflow-status-text>点开某条工作流 Prompt 或步骤后，这里会显示当前对照关系。</span>
+        </section>
         <form data-prompt-form hidden>
           <input type="hidden" name="id" />
           <label class="field-label">
-            <span data-source-title-label>Prompt Title / Prompt 标题</span>
+            <span data-source-title-label>标题</span>
             <input name="sourceTitle" type="text" />
           </label>
 
           <label class="field-label" data-source-content-wrap>
-            <span data-source-content-label>Prompt Content / Prompt 内容</span>
+            <span data-source-content-label>内容</span>
             <textarea name="selectedText" rows="10"></textarea>
           </label>
 
           <section class="detail-source-block">
-            <h3>Prompt 来源</h3>
+            <h3>来源信息</h3>
             <div data-prompt-meta class="stack"></div>
           </section>
 
@@ -97,7 +105,7 @@
 
           <div class="action-row">
             <button type="submit" data-source-save-button>保存 Prompt</button>
-            <button type="button" data-action="optimize-conversation" data-source-optimize-button>Optimize Prompt / 一键优化</button>
+            <button type="button" data-action="optimize-conversation" data-source-optimize-button>一键优化 Prompt</button>
             <button type="button" data-action="clear-detail">关闭</button>
           </div>
         </form>
@@ -106,62 +114,87 @@
           <input type="hidden" name="kind" />
 
           <label class="field-label">
-            <span>Name / 名称</span>
+            <span>名称</span>
             <input name="name" type="text" />
           </label>
 
           <label class="field-label">
-            <span>Scenario / 使用场景</span>
+            <span>使用场景</span>
             <input name="scenario" type="text" list="skillclip-scenario-options" />
           </label>
 
           <label class="field-label">
-            <span>Use When / 适用场景</span>
+            <span>适用场景</span>
             <textarea name="useWhen" rows="3"></textarea>
           </label>
 
           <label class="field-label">
-            <span>Not For / 不适用</span>
+            <span>不适用</span>
             <textarea name="notFor" rows="3"></textarea>
           </label>
 
           <label class="field-label">
-            <span>Goal / 目标</span>
+            <span>目标</span>
             <textarea name="goal" rows="3"></textarea>
           </label>
 
           <label class="field-label">
-            <span>Steps / 步骤（每行一步）</span>
+            <span>步骤（每行一步）</span>
             <textarea name="steps" rows="6"></textarea>
           </label>
+          <p class="muted detail-inline-note">
+            这里写的是“你执行这条工作流时要做的步骤”，不是把 Prompt 原文重复写一遍。
+          </p>
 
           <details class="raw-json-wrap">
-            <summary>Runbook / 运行手册（自动生成）</summary>
+            <summary>运行手册（自动生成）</summary>
             <label class="field-label">
-              <span>Runbook / 运行手册</span>
+              <span>运行手册</span>
               <textarea name="promptTemplate" rows="8"></textarea>
             </label>
+            <p class="muted detail-inline-note">
+              这里是最终给 AI 执行的完整运行文本，会把输入、步骤、输出要求和检查项组织成一份 SOP。
+            </p>
           </details>
 
           <label class="field-label">
-            <span>Output Format / 输出格式</span>
+            <span>输出格式</span>
             <input name="outputFormat" type="text" />
           </label>
 
           <label class="field-label">
-            <span>Success Criteria / 成功标准（每行一条）</span>
+            <span>成功标准（每行一条）</span>
             <textarea name="successCriteria" rows="5"></textarea>
           </label>
 
           <div class="action-row">
-            <button type="submit">Save Changes / 保存修改</button>
-            <button type="button" data-action="run-skill-check">Run Skill Check / 试运行检查</button>
+            <button type="submit">保存修改</button>
+            <button type="button" data-action="run-skill-check">试运行检查</button>
             <button type="button" data-action="clear-detail">关闭</button>
           </div>
         </form>
 
-        <details class="detail-source-block detail-fold detail-fold-workflow" data-workflow-prompts-panel hidden open>
-          <summary>工作流 Prompt</summary>
+        <section class="detail-source-block detail-fold-workflow workflow-alignment-panel workflow-primary-panel" data-workflow-alignment-panel hidden>
+          <h3>工作流对照</h3>
+          <p class="muted detail-inline-note">
+            左边是给 AI 使用的工作流 Prompt，右边是你执行这条 workflow 时的人类步骤。两边一一对应。
+          </p>
+          <div data-workflow-alignment-content class="stack"></div>
+        </section>
+
+        <section class="detail-source-block detail-fold-workflow workflow-runbook-panel workflow-primary-panel" data-runbook-primary-panel hidden>
+          <h3>运行手册</h3>
+          <p class="muted detail-inline-note">
+            这是整条技能最后给 AI 执行的完整 SOP 文本。建议先看上面的 Prompt 和 Step 对照，再看这里的完整运行手册。
+          </p>
+          <div data-runbook-primary-content class="stack"></div>
+        </section>
+
+        <details class="detail-source-block detail-fold detail-fold-workflow workflow-secondary-panel" data-workflow-prompts-panel hidden>
+          <summary>工作流 Prompt（辅助查看）</summary>
+          <p class="muted detail-inline-note">
+            这里保留每一步真正给 AI 使用的优化版 Prompt，适合你在需要时再展开检查或编辑。
+          </p>
           <div data-workflow-prompts-content class="stack"></div>
         </details>
 
@@ -170,11 +203,11 @@
           <form data-workflow-prompt-form>
             <input type="hidden" name="index" />
             <label class="field-label">
-              <span>Prompt 标题</span>
+              <span>工作流标题</span>
               <input name="title" type="text" />
             </label>
             <label class="field-label">
-              <span>Prompt 内容</span>
+              <span>工作流 Prompt</span>
               <textarea name="prompt" rows="8"></textarea>
             </label>
             <div class="action-row">

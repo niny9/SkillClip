@@ -145,6 +145,23 @@ p {
   margin-bottom: 1rem;
 }
 
+.skill-overview-panel {
+  margin: 0.9rem 0 1rem;
+  background: linear-gradient(180deg, rgba(250, 246, 237, 0.96), rgba(255, 255, 255, 0.9));
+}
+
+.skill-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.skill-overview-card {
+  padding: 0.8rem 0.9rem;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.78);
+}
+
 .hero-card {
   display: grid;
   grid-template-columns: 1.4fr 1fr;
@@ -360,6 +377,15 @@ p {
   color: var(--muted);
 }
 
+.workflow-status-line {
+  position: sticky;
+  top: 0.5rem;
+  z-index: 2;
+  margin: 0.9rem 0 1rem;
+  border-color: rgba(31, 111, 95, 0.28);
+  background: linear-gradient(180deg, rgba(233, 245, 241, 0.96), rgba(255, 255, 255, 0.88));
+}
+
 .code-area {
   min-height: 280px;
   margin-top: 0.9rem;
@@ -440,6 +466,12 @@ p {
   box-shadow: 0 0 0 2px rgba(31, 111, 95, 0.12);
 }
 
+.linked-focus-card {
+  border-color: #2c7a68;
+  box-shadow: 0 0 0 3px rgba(44, 122, 104, 0.14);
+  background: rgba(239, 249, 246, 0.94);
+}
+
 .queue-card-raw {
   background: linear-gradient(180deg, rgba(250, 241, 219, 0.95), rgba(255, 255, 255, 0.82));
 }
@@ -491,6 +523,68 @@ p {
 .raw-json-wrap summary {
   cursor: pointer;
   color: var(--accent);
+}
+
+.detail-inline-note {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.workflow-alignment-panel {
+  margin-top: 1rem;
+  border-left: 5px solid #1f6f5f;
+  background: linear-gradient(180deg, rgba(233, 245, 241, 0.82), rgba(255, 255, 255, 0.9));
+}
+
+.workflow-runbook-panel {
+  margin-top: 1rem;
+  border-left: 5px solid #446c9c;
+  background: linear-gradient(180deg, rgba(232, 239, 248, 0.82), rgba(255, 255, 255, 0.9));
+}
+
+.workflow-alignment-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.workflow-alignment-col {
+  min-width: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.workflow-primary-panel h3 {
+  margin-bottom: 0.45rem;
+}
+
+.workflow-secondary-panel {
+  opacity: 0.94;
+}
+
+.workflow-secondary-panel summary {
+  color: var(--muted);
+}
+
+.workflow-runbook-card {
+  gap: 0.55rem;
+}
+
+.runbook-preview {
+  margin: 0;
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(214, 203, 184, 0.82);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.84rem;
+  line-height: 1.55;
 }
 
 .detail-panel {

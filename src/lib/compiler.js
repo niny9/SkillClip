@@ -224,18 +224,13 @@ function deriveWorkflowPromptLabel(text = "", scenario = "") {
     .trim();
 
   if (scenario === "Podcast interview planning") {
-    if (/嘉宾|人物|背景|guest/i.test(clean)) return "补充嘉宾信息";
-    if (/开场|opening|破冰/i.test(clean)) return "设计开场问题";
-    if (/追问|follow-up|深入/i.test(clean)) return "设计追问问题";
-    if (/总结|结尾|closing/i.test(clean)) return "设计收尾问题";
-    if (/目标|主题|方向/i.test(clean)) return "明确访谈目标";
+    if (/嘉宾|人物|背景|guest/i.test(clean)) return "补充嘉宾背景和人物信息，让访谈更具体";
+    if (/开场|opening|破冰/i.test(clean)) return "设计开场和破冰问题，让对话自然进入主题";
+    if (/追问|follow-up|深入/i.test(clean)) return "补充追问问题，把对话继续往深处推进";
+    if (/总结|结尾|closing/i.test(clean)) return "设计结尾问题和收束方式，方便主持人收尾";
+    if (/目标|主题|方向/i.test(clean)) return "先明确访谈目标、主题和这期内容的核心方向";
   }
-
-  const firstLine = clean
-    .split(/[。！？!?]/)
-    .map((part) => part.trim())
-    .filter(Boolean)[0] || clean;
-  return firstLine.slice(0, 14).trim() || "工作流步骤";
+  return inferWorkflowActionTitle(clean, scenario, 0);
 }
 
 export function optimizePromptLocally(conversation) {
@@ -295,83 +290,83 @@ function inferScenario({ platform, selectedText, turns, title }) {
 
 function inferOutputFormat(scenario) {
   if (scenario === "Podcast interview planning" || scenario === "Interview outline generation") {
-    return "Interview outline with sections and follow-up questions";
+    return "按部分组织的访谈提纲，包含主问题和追问";
   }
   if (scenario === "Product PRD writing") {
-    return "Structured PRD sections";
+    return "结构化 PRD 小节";
   }
   if (scenario === "Marketing copy generation") {
-    return "Headline options and copy variants";
+    return "多个标题或文案版本";
   }
-  return "Structured response";
+  return "结构化结果";
 }
 
 function inferPromptOutputFormat(scenario) {
   if (scenario === "Podcast interview planning" || scenario === "Interview outline generation") {
-    return "Markdown outline with sections, main questions, and follow-up questions";
+    return "Markdown 提纲，包含分段、小标题、主问题和追问";
   }
   if (scenario === "Product PRD writing") {
-    return "Markdown PRD with clear section headers";
+    return "带清晰标题的 Markdown PRD";
   }
   if (scenario === "Marketing copy generation") {
-    return "A small set of strong options in bullets";
+    return "若干条清晰且可直接使用的文案选项";
   }
   if (scenario === "SQL debugging") {
-    return "Step-by-step diagnosis and corrected SQL";
+    return "分步骤诊断说明和修正后的 SQL";
   }
-  return "A concise, structured Markdown response";
+  return "简洁、结构化的 Markdown 结果";
 }
 
 function inferGoal(scenario, platform) {
   if (scenario === "Podcast interview planning") {
-    return "Turn a raw topic or guest brief into a usable podcast interview plan";
+    return "把粗糙的播客主题或嘉宾信息整理成可直接使用的访谈方案。";
   }
   if (scenario === "Interview outline generation") {
-    return "Turn a topic into a structured outline with better sequencing";
+    return "把零散主题整理成结构清晰、顺序自然的访谈提纲。";
   }
   if (scenario === "Product PRD writing") {
-    return "Turn a rough product idea into a concise PRD draft";
+    return "把模糊的产品想法整理成简洁但可执行的 PRD 草稿。";
   }
   if (scenario === "Marketing copy generation") {
-    return "Generate reusable marketing copy with a clear format";
+    return "生成格式清晰、后续可以反复复用的营销文案。";
   }
-  return `Draft a reusable workflow based on the captured conversation from ${platform || "an AI tool"}`;
+  return `把从${platform || "AI 平台"}捕获到的原始对话整理成可复用的工作流。`;
 }
 
 function inferWhatItDoes(scenario) {
   if (scenario === "Podcast interview planning") {
-    return "Turns a rough topic or guest brief into a reusable podcast interview workflow.";
+    return "把粗糙的播客选题或嘉宾信息整理成可复用的访谈工作流。";
   }
   if (scenario === "Interview outline generation") {
-    return "Turns scattered notes into a reusable interview-outline workflow.";
+    return "把零散想法整理成可复用的访谈提纲工作流。";
   }
   if (scenario === "Product PRD writing") {
-    return "Turns a rough feature idea into a reusable PRD drafting workflow.";
+    return "把模糊的功能想法整理成可复用的 PRD 撰写工作流。";
   }
   if (scenario === "Marketing copy generation") {
-    return "Turns a marketing need into a reusable copy-generation workflow.";
+    return "把营销需求整理成可复用的文案生成工作流。";
   }
   if (scenario === "SQL debugging") {
-    return "Turns a broken query or debugging request into a reusable SQL troubleshooting workflow.";
+    return "把 SQL 问题整理成可复用的排错工作流。";
   }
-  return "Turns a captured AI conversation into a reusable workflow.";
+  return "把捕获到的 AI 对话整理成可复用的工作流。";
 }
 
 function inferUseWhen(scenario, selectedText = "") {
   if (scenario === "Podcast interview planning") {
-    return "Use this skill when you need to prepare a podcast or interview outline from a topic, guest brief, or rough idea.";
+    return "当你需要从一个播客主题、嘉宾背景或粗糙想法出发，快速整理出可直接使用的访谈提纲时使用。";
   }
   if (scenario === "Interview outline generation") {
-    return "Use this skill when you want AI to turn rough notes into a clearer question flow or outline.";
+    return "当你想把零散笔记整理成更清晰的问题流程或访谈提纲时使用。";
   }
-  return `Use this skill when you need help with ${scenario.toLowerCase()} and want a repeatable result based on the captured prompt or flow.`;
+  return `当你需要处理“${scenario}”相关任务，并希望把当前 prompt 或对话沉淀成可重复执行的方法时使用。`;
 }
 
 function inferNotFor(scenario) {
   if (scenario === "Podcast interview planning" || scenario === "Interview outline generation") {
-    return "Do not use this skill when you need factual research, live verification, or a final polished article instead of an interview plan.";
+    return "不适合用在需要实时事实核查、外部检索，或直接产出成稿文章的场景。";
   }
-  return `Do not use this skill when the task is unrelated to ${scenario.toLowerCase()} or requires live external verification.`;
+  return `不适合用在与“${scenario}”无关，或强依赖实时外部检索的场景。`;
 }
 
 function inferSteps(turns, scenario, selectedText = "") {
@@ -434,29 +429,38 @@ function inferWorkflowPrompts(turns = [], scenario = "", selectedText = "") {
 function inferWorkflowPromptTitle(text, index, scenario) {
   if (scenario === "Podcast interview planning") {
     if (index === 0) {
-      return "定义访谈目标";
+      return "先明确这期播客的主题、目标和讨论方向";
     }
     if (index === 1) {
-      return "补充嘉宾与约束";
+      return "再补充嘉宾背景、冲突点和访谈约束";
     }
-    return `访谈问题设计 ${index + 1}`;
+    if (/开场|破冰|opening/i.test(text)) {
+      return "设计开场和破冰问题，让对话自然进入主题";
+    }
+    if (/追问|深入|follow[- ]?up/i.test(text)) {
+      return "补充追问问题，把对话继续往深处推进";
+    }
+    if (/结尾|收尾|closing/i.test(text)) {
+      return "整理结尾问题和收束方式，方便主持人收尾";
+    }
+    return `继续完善访谈问题设计的第 ${index + 1} 步`;
   }
 
   if (scenario === "Interview outline generation") {
     if (index === 0) {
-      return "确定提纲主题";
+      return "先确定这份提纲要解决的核心主题和输出范围";
     }
     if (index === 1) {
-      return "补充结构要求";
+      return "再补充提纲结构、顺序和组织要求";
     }
-    return `提纲优化 ${index + 1}`;
+    return `继续优化提纲内容的第 ${index + 1} 步`;
   }
 
   if (scenario === "Product PRD writing") {
-    return index === 0 ? "定义产品问题" : `PRD 细化 ${index + 1}`;
+    return index === 0 ? "先明确产品问题、目标用户和要解决的场景" : `继续细化 PRD 内容的第 ${index + 1} 步`;
   }
 
-  return deriveWorkflowPromptLabel(text, scenario) || `步骤提示词 ${index + 1}`;
+  return deriveWorkflowPromptLabel(text, scenario) || `继续完成这条工作流的第 ${index + 1} 步`;
 }
 
 function optimizePromptText(text, scenario) {
@@ -529,6 +533,36 @@ function inferPromptTask(scenario) {
   return "把原始素材整理成清晰、可复用的结果，而不是一次性回答。";
 }
 
+function inferWorkflowActionTitle(text = "", scenario = "", index = 0) {
+  const normalized = String(text || "").replace(/\s+/g, " ").trim();
+
+  if (!normalized) {
+    return `继续完成这条工作流的第 ${index + 1} 步`;
+  }
+
+  if (/先|首先/.test(normalized)) {
+    return "先明确当前任务的目标、范围和预期输出";
+  }
+  if (/背景|约束|限制|补充|context|constraint/i.test(normalized)) {
+    return "再补充关键背景、限制条件和判断标准";
+  }
+  if (/改|优化|重写|调整|更具体|更清晰|polish|refine/i.test(normalized)) {
+    return "再基于已有结果继续优化表达、结构和细节";
+  }
+  if (/总结|整理|输出|给我一版|生成|写出|产出/i.test(normalized)) {
+    return "最后整理成一份结构清晰、可以直接使用的结果";
+  }
+  if (/验证|检查|review|check/i.test(normalized)) {
+    return "再检查当前结果是否满足要求并补齐缺口";
+  }
+
+  if (scenario === "Reusable AI workflow" || scenario === "General AI workflow") {
+    return `继续推进这条工作流的第 ${index + 1} 步`;
+  }
+
+  return `继续完成“${scenario}”的第 ${index + 1} 步`;
+}
+
 function inferPromptRequirements(scenario) {
   if (scenario === "Podcast interview planning") {
     return [
@@ -588,23 +622,27 @@ function createStepsFromWorkflowPrompts(workflowPrompts = [], scenario = "") {
   return workflowPrompts.map((item, index) => {
     const title = item?.title || `步骤 ${index + 1}`;
     const sections = parseStructuredPromptSections(item?.prompt || "");
-    const task = (sections.task || sections.body || "").replace(/\s+/g, " ").trim();
-    const compactTask = task
-      .replace(/^请你|请|需要你/g, "")
-      .replace(/[。.!！?？]+$/g, "")
-      .trim();
+    const context = (sections.context || sections.body || "").replace(/\s+/g, " ").trim();
     if (scenario === "Podcast interview planning") {
       if (index === 0) {
-        return compactTask ? `明确访谈目标和核心话题：${compactTask}` : `明确访谈目标和核心话题：${title}`;
+        return "先明确访谈主题、核心冲突和这期内容最想回答的问题。";
       }
       if (index === workflowPrompts.length - 1) {
-        return compactTask ? `整理可直接使用的访谈输出：${compactTask}` : `整理可直接使用的访谈输出：${title}`;
+        return "最后把问题整理成主持人可以直接拿来录制前准备的提纲。";
       }
     }
-    if (compactTask) {
-      return `${title}：${compactTask}`;
+
+    if (/背景|约束|限制|嘉宾|对象/i.test(context)) {
+      return "补充关键背景、对象信息和限制条件，让后续输出更贴合真实场景。";
     }
-    return `${title}：执行这一段优化后的工作流 Prompt。`;
+    if (/改|优化|重写|深入|具体|更像|调整/i.test(context)) {
+      return "基于上一轮结果继续优化内容，增强细节、结构或表达质量。";
+    }
+    if (/总结|整理|输出|生成|提纲|方案|结果/i.test(context)) {
+      return "整理并输出一版结构化结果，确保内容可以直接复用或继续迭代。";
+    }
+
+    return `完成“${title}”这一步，并把结果推进到下一步可继续使用的状态。`;
   });
 }
 

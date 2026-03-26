@@ -130,56 +130,56 @@ function renderAssetBrowser(state) {
   }
 
   node.innerHTML = [
-    renderBrowserList("Raw Captures / 原始素材", "inbox", inboxItems, (item) => {
+    renderBrowserList("原始素材", "inbox", inboxItems, (item) => {
       const linkedDraft = findLinkedDraftForConversation(item.id, state);
-      const title = item.sourceTitle || item.selectedText || item.sourcePlatform || "Untitled capture";
+      const title = item.sourceTitle || item.selectedText || item.sourcePlatform || "未命名素材";
       const subtitle = `${item.sourcePlatform || "unknown"} · ${item.captureMode || "capture"}`;
       const preview = item.selectedText || item.turns?.[0]?.text || "";
       return `
         <article class="browser-item clickable-card" data-asset-kind="conversation" data-asset-id="${item.id}">
           <strong>${escapeHtml(title)}</strong>
           <p class="muted">${escapeHtml(subtitle)}</p>
-          <p class="muted">${escapeHtml(linkedDraft ? `Linked suggestion / 已整理建议: ${linkedDraft.name || linkedDraft.scenario || "Untitled"}` : "No linked suggestion yet / 还没有整理结果")}</p>
-          <p>${escapeHtml(preview.slice(0, 180) || "No preview text yet.")}</p>
+          <p class="muted">${escapeHtml(linkedDraft ? `已整理建议：${linkedDraft.name || linkedDraft.scenario || "未命名建议"}` : "还没有整理结果")}</p>
+          <p>${escapeHtml(preview.slice(0, 180) || "这里还没有可预览的内容。")}</p>
           <div class="action-row">
-            <button type="button" data-action="archive-asset" data-kind="conversation" data-id="${item.id}">Archive / 归档</button>
-            <button type="button" data-action="delete-asset" data-kind="conversation" data-id="${item.id}">Delete / 删除</button>
+            <button type="button" data-action="archive-asset" data-kind="conversation" data-id="${item.id}">归档</button>
+            <button type="button" data-action="delete-asset" data-kind="conversation" data-id="${item.id}">删除</button>
           </div>
         </article>
       `;
     }),
-    renderBrowserList("Ready Skills / 可复用技能", "ready", filteredSkillItems, (item) => {
+    renderBrowserList("可复用技能", "ready", filteredSkillItems, (item) => {
       const variantCount = variantItems.filter((variant) => variant.baseSkillId === item.id).length;
       return `
         <article class="browser-item clickable-card" data-asset-kind="skill" data-asset-id="${item.id}">
-          <strong>${escapeHtml(item.name || "Untitled skill")}</strong>
-          <p class="muted">${escapeHtml(item.useWhen || item.scenario || "No use-when summary yet.")}</p>
-          <p>${escapeHtml((item.successCriteria || item.outputFormat || "").slice(0, 180) || "No success criteria yet.")}</p>
-          <p class="muted">Variants / 变体: ${variantCount}</p>
+          <strong>${escapeHtml(item.name || "未命名技能")}</strong>
+          <p class="muted">${escapeHtml(item.useWhen || item.scenario || "还没有适用场景说明。")}</p>
+          <p>${escapeHtml((item.successCriteria || item.outputFormat || "").slice(0, 180) || "还没有成功标准。")}</p>
+          <p class="muted">优化版本：${variantCount}</p>
           <div class="action-row">
-            <button type="button" data-action="archive-asset" data-kind="skill" data-id="${item.id}">Archive / 归档</button>
-            <button type="button" data-action="delete-asset" data-kind="skill" data-id="${item.id}">Delete / 删除</button>
+            <button type="button" data-action="archive-asset" data-kind="skill" data-id="${item.id}">归档</button>
+            <button type="button" data-action="delete-asset" data-kind="skill" data-id="${item.id}">删除</button>
           </div>
         </article>
       `;
     }),
-    renderBrowserList("Variants / 同场景优化版本", "variant", variantItems, (item) => `
+    renderBrowserList("同场景优化版本", "variant", variantItems, (item) => `
       <article class="browser-item clickable-card" data-asset-kind="variant" data-asset-id="${item.id}">
-        <strong>${escapeHtml(item.name || "Untitled variant")}</strong>
-        <p class="muted">${escapeHtml(item.baseSkillId ? `Base / 基础技能: ${item.baseSkillId}` : "No base skill linked.")}</p>
-        <p>${escapeHtml((item.goal || item.promptTemplate || "").slice(0, 180) || "No variant summary yet.")}</p>
+        <strong>${escapeHtml(item.name || "未命名优化版本")}</strong>
+        <p class="muted">${escapeHtml(item.baseSkillId ? `基础技能：${item.baseSkillId}` : "还没有关联基础技能。")}</p>
+        <p>${escapeHtml((item.goal || item.promptTemplate || "").slice(0, 180) || "还没有优化说明。")}</p>
         <div class="action-row">
-          <button type="button" data-action="delete-asset" data-kind="variant" data-id="${item.id}">Delete / 删除</button>
+          <button type="button" data-action="delete-asset" data-kind="variant" data-id="${item.id}">删除</button>
         </div>
       </article>
     `),
-    renderBrowserList("Archived / 已归档", "archived", archivedItems, (item) => `
+    renderBrowserList("已归档", "archived", archivedItems, (item) => `
       <article class="browser-item clickable-card" data-asset-kind="${escapeHtml(item.kind || "conversation")}" data-asset-id="${item.id}">
-        <strong>${escapeHtml(item.name || item.title || "Archived item")}</strong>
+        <strong>${escapeHtml(item.name || item.title || "已归档条目")}</strong>
         <p class="muted">${escapeHtml(item.kind || "asset")}</p>
         <div class="action-row">
-          <button type="button" data-action="restore-asset" data-kind="${escapeHtml(item.kind || "conversation")}" data-id="${item.id}">Restore / 恢复</button>
-          <button type="button" data-action="delete-asset" data-kind="${escapeHtml(item.kind || "conversation")}" data-id="${item.id}">Delete / 删除</button>
+          <button type="button" data-action="restore-asset" data-kind="${escapeHtml(item.kind || "conversation")}" data-id="${item.id}">恢复</button>
+          <button type="button" data-action="delete-asset" data-kind="${escapeHtml(item.kind || "conversation")}" data-id="${item.id}">删除</button>
         </div>
       </article>
     `)
@@ -189,7 +189,7 @@ function renderAssetBrowser(state) {
 function renderBrowserList(title, stage, items, renderer) {
   const content = items.length
     ? items.map((item) => renderer(item)).join("")
-    : `<p class="muted">Nothing here yet.</p>`;
+    : `<p class="muted">这里还没有内容。</p>`;
 
   return `
     <section class="browser-section browser-section-${stage}">
@@ -217,7 +217,7 @@ function renderGroupedBrowserByPlatform(groups, state) {
       ...groups.variantItems.filter((item) => getAssetPlatform(item, state) === key).map((item) => ({ ...item, _kind: "variant" })),
       ...groups.archivedItems.filter((item) => getAssetPlatform(item, state) === key).map((item) => ({ ...item, _kind: item.kind || "conversation" }))
     ];
-    return renderGroupedSection(`Platform / 平台: ${key}`, "platform", items);
+    return renderGroupedSection(`平台：${key}`, "platform", items);
   }).join("");
 }
 
@@ -236,14 +236,14 @@ function renderGroupedBrowserByScenario(groups, state) {
       ...groups.variantItems.filter((item) => getAssetScenario(item, state) === key).map((item) => ({ ...item, _kind: "variant" })),
       ...groups.archivedItems.filter((item) => getAssetScenario(item, state) === key).map((item) => ({ ...item, _kind: item.kind || "conversation" }))
     ];
-    return renderGroupedSection(`Scenario / 场景: ${key}`, "scenario", items);
+    return renderGroupedSection(`场景：${key}`, "scenario", items);
   }).join("");
 }
 
 function renderGroupedSection(title, stage, items) {
   const content = items.length
     ? items.map((item) => renderCompactAssetItem(item)).join("")
-    : "<p class='muted'>Nothing here yet.</p>";
+    : "<p class='muted'>这里还没有内容。</p>";
   return `
     <section class="browser-section browser-section-${stage}">
       <div class="status-line">
@@ -257,18 +257,18 @@ function renderGroupedSection(title, stage, items) {
 
 function renderCompactAssetItem(item) {
   const labelMap = {
-    conversation: "Raw / 原始素材",
-    skill: "Skill / 技能",
-    variant: "Variant / 优化版",
-    draft: "Draft / 草稿"
+    conversation: "原始素材",
+    skill: "技能",
+    variant: "优化版",
+    draft: "草稿"
   };
-  const title = item.name || item.sourceTitle || item.selectedText || "Untitled asset";
+  const title = item.name || item.sourceTitle || item.selectedText || "未命名条目";
   const preview = item.selectedText || item.useWhen || item.goal || item.promptTemplate || item.turns?.[0]?.text || "";
   return `
     <article class="browser-item clickable-card" data-asset-kind="${escapeHtml(item._kind || item.kind || "conversation")}" data-asset-id="${item.id}">
       <strong>${escapeHtml(title)}</strong>
       <p class="muted">${escapeHtml(labelMap[item._kind || item.kind || "conversation"] || "Asset")}</p>
-      <p>${escapeHtml(String(preview).slice(0, 180) || "No preview text yet.")}</p>
+      <p>${escapeHtml(String(preview).slice(0, 180) || "这里还没有可预览的内容。")}</p>
     </article>
   `;
 }
