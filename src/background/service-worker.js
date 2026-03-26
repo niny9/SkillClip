@@ -1,6 +1,7 @@
 import { buildSkillStructureFromWorkflowPrompts, compileSkillDraft, createVariantFromSkill, optimizePromptLocally, optimizeWorkflowPromptLocally, promoteDraftToSkill } from "../lib/compiler.js";
 import { extractSkillDraftWithApi, optimizePromptWithApi, optimizeWorkflowPromptWithApi, optimizeWorkflowTurnsWithApi, reviewSkillWithApi, runSkillCheck, runWorkflowPromptCheck, testApiConnection } from "../lib/api-review.js";
 import { MESSAGE_TYPES } from "../lib/constants.js";
+import { buildAssetExportContent, buildExportFileName, buildNotionPagePayload, buildObsidianUri, resolveObsidianFolder } from "../lib/exporters.js";
 import { ensureContentScript } from "../lib/injection.js";
 import { validateSkillAsset } from "../lib/validator.js";
 import { createId, nowIso } from "../lib/utils.js";
@@ -140,6 +141,10 @@ async function handleMessage(message, sender) {
       );
     case MESSAGE_TYPES.TEST_API_CONNECTION:
       return testApiConnection(message.payload);
+    case MESSAGE_TYPES.TEST_KNOWLEDGE_CONNECTION:
+      return testKnowledgeConnection(message.payload);
+    case MESSAGE_TYPES.EXPORT_ASSET_TO_KNOWLEDGE_BASE:
+      return exportAssetToKnowledgeBase(message.payload);
     case MESSAGE_TYPES.RUN_SKILL_CHECK:
       return runSkillCheckForAsset(message.payload);
     case MESSAGE_TYPES.RUN_WORKFLOW_PROMPT_CHECK:
@@ -186,9 +191,194 @@ async function saveConversationMemory(payload, captureMode) {
   return item;
 }
 
+async function exportAssetIfNeeded(asset, kind, settings) {
+  if (!settings?.knowledgeSyncEnabled) {
+    return null;
+  }
+
+  if (kind === "conversation" && !settings.autoExportCaptures) {
+    return null;
+  }
+
+  if ((kind === "skill" || kind === "draft") && !settings.autoExportSkills) {
+    return null;
+  }
+
+  const format = settings.knowledgeExportFormat || "markdown";
+  const target = settings.knowledgeExportTarget || "download";
+
+  if (target === "download") {
+    const content = buildAssetExportContent(asset, kind, format);
+    const blob = new Blob([content], {
+      type: format === "json" ? "application/json" : "text/markdown"
+    });
+    const url = URL.createObjectURL(blob);
+    try {
+      await chrome.downloads.download({
+        url,
+        filename: `SkillClip/${buildExportFileName(asset, kind, format)}`,
+        saveAs: false
+      });
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+    return { target, format, ok: true };
+  }
+
+  if (target === "obsidian") {
+    const uri = buildObsidianUri({
+      asset,
+      kind,
+      format,
+      vault: settings.obsidianVault || "",
+      folder: resolveObsidianFolder(settings.obsidianFolder || "SkillClip", kind, settings.obsidianOrganizeByKind !== false)
+    });
+    await chrome.tabs.create({ url: uri, active: false });
+    return { target, format, ok: true };
+  }
+
+  if (target === "notion") {
+    const parentType = settings.notionParentType || "page";
+    const parentPageId = settings.notionParentPageId?.trim();
+    const databaseId = settings.notionDatabaseId?.trim();
+
+    if (!settings.notionToken?.trim()) {
+      throw new Error("Notion 联动缺少 Token");
+    }
+    if (parentType === "page" && !parentPageId) {
+      throw new Error("Notion 联动缺少父页面 ID");
+    }
+    if (parentType === "database" && !databaseId) {
+      throw new Error("Notion 联动缺少数据库 ID");
+    }
+
+    let databaseInfo = null;
+    if (parentType === "database") {
+      const schemaResponse = await fetch(`https://api.notion.com/v1/databases/${databaseId}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${settings.notionToken.trim()}`,
+          "Notion-Version": "2022-06-28"
+        }
+      });
+      if (!schemaResponse.ok) {
+        const text = await schemaResponse.text();
+        throw new Error(`Notion 数据库读取失败：${text.slice(0, 200)}`);
+      }
+      databaseInfo = await schemaResponse.json();
+    }
+
+    const response = await fetch("https://api.notion.com/v1/pages", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${settings.notionToken.trim()}`,
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(buildNotionPagePayload({
+        asset,
+        kind,
+        parentType,
+        parentPageId,
+        databaseId,
+        databaseInfo
+      }))
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Notion 保存失败：${text.slice(0, 200)}`);
+    }
+
+    return { target, format, ok: true };
+  }
+
+  return null;
+}
+
+async function testKnowledgeConnection(settings) {
+  const target = settings?.knowledgeExportTarget || "download";
+
+  if (target === "download") {
+    return { ok: true, message: "本地下载模式无需额外连接测试，可以直接使用。" };
+  }
+
+  if (target === "obsidian") {
+    if (!settings?.obsidianVault?.trim()) {
+      return { ok: false, message: "请先填写 Obsidian Vault 名称。" };
+    }
+    return {
+      ok: true,
+      message: `Obsidian 配置已填写。当前会保存到 ${resolveObsidianFolder(settings.obsidianFolder || "SkillClip", "skill", settings.obsidianOrganizeByKind !== false)}。`
+    };
+  }
+
+  if (target === "notion") {
+    const parentType = settings?.notionParentType || "page";
+    if (!settings?.notionToken?.trim()) {
+      return { ok: false, message: "请先填写 Notion Token。" };
+    }
+    const notionId = parentType === "database"
+      ? settings?.notionDatabaseId?.trim()
+      : settings?.notionParentPageId?.trim();
+    if (!notionId) {
+      return { ok: false, message: parentType === "database" ? "请先填写 Notion 数据库 ID。" : "请先填写 Notion 父页面 ID。" };
+    }
+
+    const endpoint = parentType === "database"
+      ? `https://api.notion.com/v1/databases/${notionId}`
+      : `https://api.notion.com/v1/pages/${notionId}`;
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${settings.notionToken.trim()}`,
+        "Notion-Version": "2022-06-28"
+      }
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      return { ok: false, message: `Notion 连接失败：${text.slice(0, 200)}` };
+    }
+
+    return { ok: true, message: parentType === "database" ? "Notion 连接正常，数据库可访问。" : "Notion 连接正常，父页面可访问。" };
+  }
+
+  return { ok: false, message: "当前知识库目标暂不支持测试。" };
+}
+
+async function exportAssetToKnowledgeBase(payload) {
+  const persistedSettings = await getSettings();
+  const settings = { ...persistedSettings, ...(payload.settings || {}) };
+  const kind = payload.kind;
+  const id = payload.id;
+  let asset = null;
+
+  if (kind === "conversation") {
+    asset = await findConversationById(id);
+  } else if (kind === "draft") {
+    asset = await findDraftById(id);
+  } else if (kind === "skill") {
+    asset = await findSkillById(id);
+  } else if (kind === "variant") {
+    asset = await findVariantById(id);
+  }
+
+  if (!asset) {
+    throw new Error("没有找到要导出的条目。");
+  }
+
+  const exportResult = await exportAssetIfNeeded(asset, kind, {
+    ...settings,
+    knowledgeSyncEnabled: true
+  });
+  return exportResult || { ok: false, message: "当前导出目标没有执行导出。" };
+}
+
 async function saveCapturedItem(payload, captureMode) {
   const settings = await getSettings();
   const memory = await saveConversationMemory(payload, captureMode);
+  let exportResult = null;
 
   let preview = null;
   if (settings.autoCompileAfterCapture) {
@@ -209,11 +399,23 @@ async function saveCapturedItem(payload, captureMode) {
         updatedAt: nowIso()
       }));
       await broadcastStorageUpdate();
-      return { memory: await findConversationById(memory.id), preview: null };
+      const savedMemory = await findConversationById(memory.id);
+      try {
+        exportResult = await exportAssetIfNeeded(savedMemory, "conversation", settings);
+      } catch (error) {
+        exportResult = { ok: false, error: error.message };
+      }
+      return { memory: savedMemory, preview: null, exportResult };
     }
   }
 
-  return { memory: await findConversationById(memory.id), preview };
+  const savedMemory = await findConversationById(memory.id);
+  try {
+    exportResult = await exportAssetIfNeeded(savedMemory, "conversation", settings);
+  } catch (error) {
+    exportResult = { ok: false, error: error.message };
+  }
+  return { memory: savedMemory, preview, exportResult };
 }
 
 async function compileConversationToDraft(payload) {
@@ -311,6 +513,11 @@ async function promoteDraft(draftId) {
   skill = await applyApiValidationIfNeeded(skill, settings);
   await insertSkill(skill);
   await removeDraft(draftId);
+  try {
+    await exportAssetIfNeeded(skill, "skill", settings);
+  } catch (error) {
+    console.warn("[SkillClip] export after promote failed", error);
+  }
   await broadcastStorageUpdate();
   return skill;
 }

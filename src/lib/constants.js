@@ -42,6 +42,8 @@ export const MESSAGE_TYPES = {
   GET_SKILL_INPUT_MEMORY: "skillclip/get-skill-input-memory",
   SAVE_SKILL_INPUT_MEMORY: "skillclip/save-skill-input-memory",
   TEST_API_CONNECTION: "skillclip/test-api-connection",
+  TEST_KNOWLEDGE_CONNECTION: "skillclip/test-knowledge-connection",
+  EXPORT_ASSET_TO_KNOWLEDGE_BASE: "skillclip/export-asset-to-knowledge-base",
   RUN_SKILL_CHECK: "skillclip/run-skill-check",
   RUN_WORKFLOW_PROMPT_CHECK: "skillclip/run-workflow-prompt-check",
   RESET_STATE: "skillclip/reset-state",

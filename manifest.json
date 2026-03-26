@@ -10,7 +10,8 @@
     "scripting",
     "activeTab",
     "tabs",
-    "sidePanel"
+    "sidePanel",
+    "downloads"
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
@@ -28,7 +29,8 @@
     "https://tongyi.aliyun.com/*",
     "https://qianwen.aliyun.com/*",
     "https://copilot.microsoft.com/*",
-    "https://open.bigmodel.cn/*"
+    "https://open.bigmodel.cn/*",
+    "https://api.notion.com/*"
   ],
   "background": {
     "service_worker": "src/background/service-worker.js",

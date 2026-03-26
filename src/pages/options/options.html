@@ -27,15 +27,15 @@
           <h2>当前状态</h2>
           <div class="stack compact-stack">
             <div class="status-line">
-              <span>Detected AI page / 当前识别平台</span>
+              <span>当前识别平台</span>
               <strong data-active-tab>检测中...</strong>
             </div>
             <div class="status-line">
-              <span>Supported AI tabs / 已打开支持页面</span>
+              <span>已打开支持页面</span>
               <strong data-count="supported_tabs">0</strong>
             </div>
             <div class="status-line">
-              <span>Inbox raw captures / 待整理素材</span>
+              <span>待整理素材</span>
               <strong data-count="conversations">0</strong>
             </div>
             <div class="status-line">
@@ -47,7 +47,7 @@
               <strong data-count="variants">0</strong>
             </div>
             <div class="status-line">
-              <span>Archived items / 已归档</span>
+              <span>已归档</span>
               <strong data-count="archived">0</strong>
             </div>
           </div>
@@ -55,7 +55,7 @@
         <article class="card">
           <h2>使用说明</h2>
           <details class="guide-wrap" open>
-            <summary>How To Use / 如何使用</summary>
+            <summary>如何使用</summary>
             <div class="checklist">
               <p>1. 原始素材：你保存的 prompt 或整段对话原文。</p>
               <p>2. 可复用技能：系统会自动整理，你可以直接编辑，或者直接升级为正式技能。</p>
@@ -64,7 +64,7 @@
             </div>
           </details>
           <details class="guide-wrap">
-            <summary>Debug Checklist / 调试说明</summary>
+            <summary>调试说明</summary>
             <div class="checklist">
               <p>1. If buttons do nothing, refresh the AI page after reloading the extension.</p>
               <p>2. If capture is empty, make sure the page is one of the supported AI domains.</p>
@@ -76,13 +76,13 @@
       </section>
 
       <section class="card">
-        <h2>Local Assets / 本地资产</h2>
+        <h2>本地资产</h2>
         <p class="muted">
           先按资产分类查看内容。只有在备份或调试时，才需要看 JSON。
         </p>
         <div class="asset-filter-row">
           <label class="field-label compact-field">
-            <span>View By / 查看维度</span>
+            <span>查看维度</span>
             <select data-asset-view>
               <option value="stage">按阶段</option>
               <option value="platform">按 AI 平台</option>
@@ -90,21 +90,22 @@
             </select>
           </label>
           <label class="field-label compact-field">
-            <span>Platform Filter / 平台筛选</span>
+            <span>平台筛选</span>
             <select data-platform-filter>
-              <option value="all">All / 全部</option>
+              <option value="all">全部</option>
             </select>
           </label>
           <label class="field-label compact-field">
-            <span>Scenario Filter / 场景筛选</span>
+            <span>场景筛选</span>
             <select data-scenario-filter>
-              <option value="all">All / 全部</option>
+              <option value="all">全部</option>
             </select>
           </label>
         </div>
         <div class="action-row">
           <button type="button" data-action="refresh-state">刷新快照</button>
           <button type="button" data-action="show-full-json">显示全部快照</button>
+          <button type="button" data-action="download-markdown">下载当前 Markdown</button>
           <button type="button" data-action="copy-json">复制当前 JSON</button>
           <button type="button" data-action="download-json">下载当前 JSON</button>
         </div>
@@ -130,7 +131,7 @@
           </select>
         </label>
         <label class="field-label">
-          <span>Provider / 服务商</span>
+          <span>服务商</span>
           <select data-setting="apiProvider">
             <option value="custom">自定义</option>
             <option value="zhipu">智谱</option>
@@ -138,16 +139,16 @@
           </select>
         </label>
         <label class="field-label">
-          <span>API Base URL / 接口地址</span>
+          <span>接口地址</span>
           <input data-setting="apiBaseUrl" type="text" placeholder="https://api.example.com/v1/chat/completions" />
         </label>
         <label class="field-label">
-          <span>API Model / 模型名</span>
+          <span>模型名</span>
           <input data-setting="apiModel" type="text" placeholder="gpt-4.1-mini / custom-model" />
         </label>
         <label class="field-label">
-          <span>API Key / 密钥</span>
-          <input data-setting="apiKey" type="password" placeholder="Stored locally in this prototype" />
+          <span>密钥</span>
+          <input data-setting="apiKey" type="password" placeholder="当前仅保存在本地浏览器中" />
         </label>
         <label class="field-label">
           <span>
@@ -178,6 +179,87 @@
             <p>5. Submit to Chrome Web Store with the privacy disclosures.</p>
           </div>
         </details>
+      </section>
+
+      <section class="card">
+        <h2>知识库联动</h2>
+        <div class="checklist">
+          <p>你现在可以在保存后自动导出成 Markdown 或 JSON。</p>
+          <p>当前支持：本地下载、Obsidian、Notion。用户可以自己选择导出目标。</p>
+        </div>
+        <label class="field-label">
+          <span>
+            <input data-setting="knowledgeSyncEnabled" type="checkbox" />
+            启用保存后联动
+          </span>
+        </label>
+        <label class="field-label">
+          <span>导出目标</span>
+          <select data-setting="knowledgeExportTarget">
+            <option value="download">本地下载</option>
+            <option value="obsidian">Obsidian</option>
+            <option value="notion">Notion</option>
+          </select>
+        </label>
+        <label class="field-label">
+          <span>导出格式</span>
+          <select data-setting="knowledgeExportFormat">
+            <option value="markdown">Markdown</option>
+            <option value="json">JSON</option>
+          </select>
+        </label>
+        <label class="field-label">
+          <span>
+            <input data-setting="autoExportCaptures" type="checkbox" />
+            保存 Prompt / Whole Flow 后自动导出原始素材
+          </span>
+        </label>
+        <label class="field-label">
+          <span>
+            <input data-setting="autoExportSkills" type="checkbox" />
+            升级为可复用技能后自动导出技能
+          </span>
+        </label>
+        <label class="field-label" data-kb-obsidian-field>
+          <span>Obsidian Vault</span>
+          <input data-setting="obsidianVault" type="text" placeholder="例如：MyVault" />
+        </label>
+        <label class="field-label" data-kb-obsidian-field>
+          <span>Obsidian 目录</span>
+          <input data-setting="obsidianFolder" type="text" placeholder="例如：SkillClip" />
+        </label>
+        <label class="field-label" data-kb-obsidian-field>
+          <span>
+            <input data-setting="obsidianOrganizeByKind" type="checkbox" />
+            按资产类型自动分目录保存
+          </span>
+        </label>
+        <label class="field-label" data-kb-notion-field>
+          <span>Notion Integration Token</span>
+          <input data-setting="notionToken" type="password" placeholder="secret_xxx" />
+        </label>
+        <label class="field-label" data-kb-notion-field>
+          <span>Notion 写入位置类型</span>
+          <select data-setting="notionParentType">
+            <option value="page">父页面</option>
+            <option value="database">数据库</option>
+          </select>
+        </label>
+        <label class="field-label" data-kb-notion-database-field>
+          <span>Notion 数据库 ID</span>
+          <input data-setting="notionDatabaseId" type="text" placeholder="32位数据库 ID" />
+        </label>
+        <label class="field-label" data-kb-notion-page-field>
+          <span>Notion 父页面 ID</span>
+          <input data-setting="notionParentPageId" type="text" placeholder="32位页面 ID" />
+        </label>
+        <p class="muted" data-knowledge-feedback>
+          开启后，保存素材或升级技能时会按你的设置自动落地到对应知识库。
+        </p>
+        <div class="action-row">
+          <button type="button" data-action="test-knowledge">测试知识库连接</button>
+          <button type="button" data-action="export-selected-to-kb">导出当前条目到知识库</button>
+        </div>
       </section>
     </main>
     <script type="module" src="./options.js"></script>

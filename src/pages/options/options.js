@@ -1,4 +1,5 @@
 import { MESSAGE_TYPES } from "../../lib/constants.js";
+import { buildAssetExportContent, buildExportFileName } from "../../lib/exporters.js";
 
 let latestState = null;
 let selectedAssetSnapshot = null;
@@ -301,8 +302,8 @@ function populateAssetFilters(state) {
     ...assets.map((item) => getAssetScenario(item, state))
   ]);
 
-  platformSelect.innerHTML = [`<option value="all">All / 全部</option>`, ...platforms.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`)].join("");
-  scenarioSelect.innerHTML = [`<option value="all">All / 全部</option>`, ...scenarios.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`)].join("");
+  platformSelect.innerHTML = [`<option value="all">全部</option>`, ...platforms.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`)].join("");
+  scenarioSelect.innerHTML = [`<option value="all">全部</option>`, ...scenarios.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`)].join("");
   platformSelect.value = platforms.includes(currentPlatform) ? currentPlatform : "all";
   scenarioSelect.value = scenarios.includes(currentScenario) ? currentScenario : "all";
 }
@@ -378,6 +379,18 @@ function populateSettings(settings) {
   const apiKey = document.querySelector("[data-setting='apiKey']");
   const autoCompileAfterCapture = document.querySelector("[data-setting='autoCompileAfterCapture']");
   const openWorkspaceAfterCapture = document.querySelector("[data-setting='openWorkspaceAfterCapture']");
+  const knowledgeSyncEnabled = document.querySelector("[data-setting='knowledgeSyncEnabled']");
+  const knowledgeExportTarget = document.querySelector("[data-setting='knowledgeExportTarget']");
+  const knowledgeExportFormat = document.querySelector("[data-setting='knowledgeExportFormat']");
+  const autoExportCaptures = document.querySelector("[data-setting='autoExportCaptures']");
+  const autoExportSkills = document.querySelector("[data-setting='autoExportSkills']");
+  const obsidianVault = document.querySelector("[data-setting='obsidianVault']");
+  const obsidianFolder = document.querySelector("[data-setting='obsidianFolder']");
+  const obsidianOrganizeByKind = document.querySelector("[data-setting='obsidianOrganizeByKind']");
+  const notionToken = document.querySelector("[data-setting='notionToken']");
+  const notionParentType = document.querySelector("[data-setting='notionParentType']");
+  const notionParentPageId = document.querySelector("[data-setting='notionParentPageId']");
+  const notionDatabaseId = document.querySelector("[data-setting='notionDatabaseId']");
 
   if (provider) {
     provider.value = settings.apiProvider || "zhipu";
@@ -400,6 +413,43 @@ function populateSettings(settings) {
   if (openWorkspaceAfterCapture) {
     openWorkspaceAfterCapture.checked = settings.openWorkspaceAfterCapture !== false;
   }
+  if (knowledgeSyncEnabled) {
+    knowledgeSyncEnabled.checked = settings.knowledgeSyncEnabled === true;
+  }
+  if (knowledgeExportTarget) {
+    knowledgeExportTarget.value = settings.knowledgeExportTarget || "download";
+  }
+  if (knowledgeExportFormat) {
+    knowledgeExportFormat.value = settings.knowledgeExportFormat || "markdown";
+  }
+  if (autoExportCaptures) {
+    autoExportCaptures.checked = settings.autoExportCaptures === true;
+  }
+  if (autoExportSkills) {
+    autoExportSkills.checked = settings.autoExportSkills !== false;
+  }
+  if (obsidianVault) {
+    obsidianVault.value = settings.obsidianVault || "";
+  }
+  if (obsidianFolder) {
+    obsidianFolder.value = settings.obsidianFolder || "SkillClip";
+  }
+  if (obsidianOrganizeByKind) {
+    obsidianOrganizeByKind.checked = settings.obsidianOrganizeByKind !== false;
+  }
+  if (notionToken) {
+    notionToken.value = settings.notionToken || "";
+  }
+  if (notionParentType) {
+    notionParentType.value = settings.notionParentType || "page";
+  }
+  if (notionParentPageId) {
+    notionParentPageId.value = settings.notionParentPageId || "";
+  }
+  if (notionDatabaseId) {
+    notionDatabaseId.value = settings.notionDatabaseId || "";
+  }
+  updateKnowledgeTargetFields();
 }
 
 async function renderActiveTabStatus() {
@@ -523,11 +573,43 @@ function setSettingsFeedback(message) {
   }
 }
 
+function setKnowledgeFeedback(message) {
+  const node = document.querySelector("[data-knowledge-feedback]");
+  if (node) {
+    node.textContent = message;
+  }
+}
+
 function setAssetFeedback(message) {
   const node = document.querySelector("[data-asset-feedback]");
   if (node) {
     node.textContent = message;
   }
+}
+
+function updateKnowledgeTargetFields() {
+  const target = document.querySelector("[data-setting='knowledgeExportTarget']")?.value || "download";
+  const notionParentType = document.querySelector("[data-setting='notionParentType']")?.value || "page";
+  document.querySelectorAll("[data-kb-obsidian-field]").forEach((node) => {
+    if (node instanceof HTMLElement) {
+      node.hidden = target !== "obsidian";
+    }
+  });
+  document.querySelectorAll("[data-kb-notion-field]").forEach((node) => {
+    if (node instanceof HTMLElement) {
+      node.hidden = target !== "notion";
+    }
+  });
+  document.querySelectorAll("[data-kb-notion-page-field]").forEach((node) => {
+    if (node instanceof HTMLElement) {
+      node.hidden = target !== "notion" || notionParentType !== "page";
+    }
+  });
+  document.querySelectorAll("[data-kb-notion-database-field]").forEach((node) => {
+    if (node instanceof HTMLElement) {
+      node.hidden = target !== "notion" || notionParentType !== "database";
+    }
+  });
 }
 
 function getAssetByKindAndId(kind, id) {
@@ -635,7 +717,7 @@ async function restoreAsset(kind, id) {
   const type = typeMap[kind];
   const payloadKey = payloadKeyMap[kind];
   if (!type || !payloadKey) {
-    setAssetFeedback("This asset type cannot be restored.");
+    setAssetFeedback("这种资产类型暂时不支持恢复。");
     return;
   }
 
@@ -644,7 +726,7 @@ async function restoreAsset(kind, id) {
     payload: { [payloadKey]: id }
   });
   await load();
-  setAssetFeedback(`Restored ${kind} / 已恢复 ${kind}。`);
+  setAssetFeedback(`已恢复${kind}。`);
 }
 
 function collectSettingsFromForm() {
@@ -661,7 +743,19 @@ function collectSettingsFromForm() {
     apiModel: modelInput?.value.trim() || "",
     apiKey: keyInput?.value.trim() || "",
     autoCompileAfterCapture: document.querySelector("[data-setting='autoCompileAfterCapture']")?.checked ?? true,
-    openWorkspaceAfterCapture: document.querySelector("[data-setting='openWorkspaceAfterCapture']")?.checked ?? true
+    openWorkspaceAfterCapture: document.querySelector("[data-setting='openWorkspaceAfterCapture']")?.checked ?? true,
+    knowledgeSyncEnabled: document.querySelector("[data-setting='knowledgeSyncEnabled']")?.checked ?? false,
+    knowledgeExportTarget: document.querySelector("[data-setting='knowledgeExportTarget']")?.value || "download",
+    knowledgeExportFormat: document.querySelector("[data-setting='knowledgeExportFormat']")?.value || "markdown",
+    autoExportCaptures: document.querySelector("[data-setting='autoExportCaptures']")?.checked ?? false,
+    autoExportSkills: document.querySelector("[data-setting='autoExportSkills']")?.checked ?? true,
+    obsidianVault: document.querySelector("[data-setting='obsidianVault']")?.value.trim() || "",
+    obsidianFolder: document.querySelector("[data-setting='obsidianFolder']")?.value.trim() || "SkillClip",
+    obsidianOrganizeByKind: document.querySelector("[data-setting='obsidianOrganizeByKind']")?.checked ?? true,
+    notionToken: document.querySelector("[data-setting='notionToken']")?.value.trim() || "",
+    notionParentType: document.querySelector("[data-setting='notionParentType']")?.value || "page",
+    notionParentPageId: document.querySelector("[data-setting='notionParentPageId']")?.value.trim() || "",
+    notionDatabaseId: document.querySelector("[data-setting='notionDatabaseId']")?.value.trim() || ""
   };
 }
 
@@ -682,6 +776,32 @@ function downloadJson(text, fileName = "skillclip-state.json") {
   URL.revokeObjectURL(url);
 }
 
+function downloadText(text, fileName, mimeType = "text/plain") {
+  const blob = new Blob([text], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function getSelectedAssetExportPayload() {
+  if (!selectedAssetSnapshot) {
+    return null;
+  }
+
+  const asset = getAssetByKindAndId(selectedAssetSnapshot.kind, selectedAssetSnapshot.id);
+  if (!asset) {
+    return null;
+  }
+
+  return {
+    asset,
+    kind: selectedAssetSnapshot.kind
+  };
+}
+
 document.addEventListener("click", async (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) {
@@ -693,7 +813,7 @@ document.addEventListener("click", async (event) => {
     const currentWindow = await chrome.windows.getCurrent();
     if (currentWindow?.id) {
       await chrome.sidePanel.open({ windowId: currentWindow.id });
-      setFeedback("Workspace opened.");
+      setFeedback("工作台已打开。");
     }
   }
 
@@ -707,7 +827,7 @@ document.addEventListener("click", async (event) => {
 
   if (action === "refresh-state") {
     await load();
-    setFeedback("State refreshed.");
+    setFeedback("当前状态已刷新。");
   }
 
   if (action === "show-full-json") {
@@ -731,10 +851,23 @@ document.addEventListener("click", async (event) => {
     setFeedback("当前 JSON 已开始下载。");
   }
 
+  if (action === "download-markdown") {
+    const selected = getSelectedAssetExportPayload();
+    if (!selected) {
+      setAssetFeedback("请先点击一条资产，再下载它的 Markdown。");
+      return;
+    }
+    setAssetFeedback("正在准备当前条目的 Markdown...");
+    const markdown = buildAssetExportContent(selected.asset, selected.kind, "markdown");
+    downloadText(markdown, buildExportFileName(selected.asset, selected.kind, "markdown"), "text/markdown");
+    setAssetFeedback("当前条目的 Markdown 已开始下载。");
+    return;
+  }
+
   if (action === "reset-state") {
     await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.RESET_STATE });
     await load();
-    setFeedback("Local data reset.");
+    setFeedback("本地数据已重置。");
   }
 
   if (action === "save-settings") {
@@ -743,16 +876,49 @@ document.addEventListener("click", async (event) => {
       payload: collectSettingsFromForm()
     });
     await load();
-    setSettingsFeedback("Validation settings saved.");
+    setSettingsFeedback("校验设置已保存。");
+    setKnowledgeFeedback("知识库联动设置已保存。");
+  }
+
+  if (action === "test-knowledge") {
+    setKnowledgeFeedback("正在测试知识库连接...");
+    const response = await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.TEST_KNOWLEDGE_CONNECTION,
+      payload: collectSettingsFromForm()
+    });
+    setKnowledgeFeedback(response.result?.message || response.error || "知识库连接测试已完成。");
+    return;
+  }
+
+  if (action === "export-selected-to-kb") {
+    if (!selectedAssetSnapshot) {
+      setKnowledgeFeedback("请先点击一条资产，再导出到知识库。");
+      return;
+    }
+    setKnowledgeFeedback("正在导出当前条目到知识库...");
+    const response = await chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.EXPORT_ASSET_TO_KNOWLEDGE_BASE,
+      payload: {
+        kind: selectedAssetSnapshot.kind,
+        id: selectedAssetSnapshot.id,
+        settings: collectSettingsFromForm()
+      }
+    });
+    if (response?.ok) {
+      setKnowledgeFeedback("当前条目已导出到知识库。");
+    } else {
+      setKnowledgeFeedback(response?.error || "导出失败，请检查知识库配置。");
+    }
+    return;
   }
 
   if (action === "test-api") {
-    setSettingsFeedback("Testing API connection...");
+    setSettingsFeedback("正在测试接口连通...");
     const response = await chrome.runtime.sendMessage({
       type: MESSAGE_TYPES.TEST_API_CONNECTION,
       payload: collectSettingsFromForm()
     });
-    setSettingsFeedback(response.result?.message || "Test finished.");
+    setSettingsFeedback(response.result?.message || "接口测试已完成。");
   }
 
   if (action === "delete-asset") {
@@ -780,6 +946,11 @@ document.addEventListener("click", async (event) => {
 document.addEventListener("change", async (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) {
+    return;
+  }
+
+  if (target.matches("[data-setting='knowledgeExportTarget'], [data-setting='notionParentType']")) {
+    updateKnowledgeTargetFields();
     return;
   }
 

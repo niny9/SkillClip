@@ -19,6 +19,18 @@ export async function getSettings() {
     apiKey: "",
     autoCompileAfterCapture: true,
     openWorkspaceAfterCapture: true,
+    knowledgeSyncEnabled: false,
+    knowledgeExportTarget: "download",
+    knowledgeExportFormat: "markdown",
+    autoExportCaptures: false,
+    autoExportSkills: true,
+    obsidianVault: "",
+    obsidianFolder: "SkillClip",
+    obsidianOrganizeByKind: true,
+    notionToken: "",
+    notionParentType: "page",
+    notionParentPageId: "",
+    notionDatabaseId: "",
     ...(result[STORAGE_KEYS.SETTINGS] || {})
   };
 }
@@ -50,6 +62,18 @@ export async function getAllState() {
       apiBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
       apiModel: "glm-4.5-air",
       apiKey: result[STORAGE_KEYS.SETTINGS]?.apiKey ? "********" : "",
+      knowledgeSyncEnabled: false,
+      knowledgeExportTarget: "download",
+      knowledgeExportFormat: "markdown",
+      autoExportCaptures: false,
+      autoExportSkills: true,
+      obsidianVault: "",
+      obsidianFolder: "SkillClip",
+      obsidianOrganizeByKind: true,
+      notionToken: result[STORAGE_KEYS.SETTINGS]?.notionToken ? "********" : "",
+      notionParentType: "page",
+      notionParentPageId: "",
+      notionDatabaseId: "",
       ...(result[STORAGE_KEYS.SETTINGS] || {})
     }
   };
