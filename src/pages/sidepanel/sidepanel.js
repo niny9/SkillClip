@@ -505,10 +505,8 @@ function showDetailPanel(item, kind) {
     renderValidationPreview(null);
     renderRunCheckPreview(null);
     renderStepMapPreview(null, item.turns || []);
-    renderWorkflowPromptsPreview(isFlowCapture ? (linkedDraft?.workflowPrompts || []) : []);
     renderVariantCompare(item, kind);
     renderSourcePreview(item);
-    renderSkillOverview(null, kind);
     renderWorkflowAlignment();
     renderRunbookPrimary(linkedDraft);
     renderWorkflowStatus();
@@ -550,10 +548,8 @@ function showDetailPanel(item, kind) {
   renderValidationPreview(kind === "variant" ? null : item.validation);
   renderRunCheckPreview(null);
   renderStepMapPreview(item.stepSources || [], item.steps || []);
-  renderWorkflowPromptsPreview(item.workflowPrompts || []);
   renderVariantCompare(item, kind);
   renderSourcePreview(item);
-  renderSkillOverview(item, kind);
   renderWorkflowAlignment();
   renderRunbookPrimary(item);
   renderWorkflowStatus();
@@ -578,8 +574,6 @@ function hideDetailPanel() {
   const runCheckContent = document.querySelector("[data-run-check-content]");
   const stepMapPanel = document.querySelector("[data-step-map-panel]");
   const stepMapContent = document.querySelector("[data-step-map-content]");
-  const workflowPromptsPanel = document.querySelector("[data-workflow-prompts-panel]");
-  const workflowPromptsContent = document.querySelector("[data-workflow-prompts-content]");
   const workflowEditorPanel = document.querySelector("[data-workflow-editor-panel]");
   const workflowPromptForm = document.querySelector("[data-workflow-prompt-form]");
   const workflowPromptCheck = document.querySelector("[data-workflow-prompt-check]");
@@ -587,8 +581,6 @@ function hideDetailPanel() {
   const compareContent = document.querySelector("[data-compare-content]");
   const runbookPrimaryPanel = document.querySelector("[data-runbook-primary-panel]");
   const runbookPrimaryContent = document.querySelector("[data-runbook-primary-content]");
-  const skillOverviewPanel = document.querySelector("[data-skill-overview-panel]");
-  const skillOverviewContent = document.querySelector("[data-skill-overview-content]");
   const title = document.querySelector("[data-detail-title]");
   const note = document.querySelector("[data-detail-note]");
   if (!form || !empty || !promptForm) {
@@ -648,12 +640,6 @@ function hideDetailPanel() {
   if (stepMapContent) {
     stepMapContent.innerHTML = "";
   }
-  if (workflowPromptsPanel) {
-    workflowPromptsPanel.hidden = true;
-  }
-  if (workflowPromptsContent) {
-    workflowPromptsContent.innerHTML = "";
-  }
   if (workflowEditorPanel) {
     workflowEditorPanel.hidden = true;
   }
@@ -675,15 +661,8 @@ function hideDetailPanel() {
   if (runbookPrimaryContent) {
     runbookPrimaryContent.innerHTML = "";
   }
-  if (skillOverviewPanel) {
-    skillOverviewPanel.hidden = true;
-  }
-  if (skillOverviewContent) {
-    skillOverviewContent.innerHTML = "";
-  }
   renderWorkflowAlignment();
   renderRunbookPrimary(null);
-  renderSkillOverview(null, null);
   renderWorkflowStatus();
   updateSupportingPanelVisibility();
 }
@@ -723,40 +702,6 @@ function summarizeConversationForEditor(item) {
     .map((turn, index) => `${index + 1}. ${turn.role === "assistant" ? "AI" : "用户"}：${turn.text || ""}`)
     .join("\n\n")
     .slice(0, 5000);
-}
-
-function renderWorkflowPromptsPreview(items) {
-  const panel = document.querySelector("[data-workflow-prompts-panel]");
-  const content = document.querySelector("[data-workflow-prompts-content]");
-  if (!panel || !content) {
-    return;
-  }
-
-  if (!Array.isArray(items) || items.length === 0) {
-    panel.hidden = true;
-    content.innerHTML = "";
-    return;
-  }
-
-  panel.hidden = false;
-  content.innerHTML = items.map((item, index) => `
-    <article class="list-card workflow-card ${selectedWorkflowPrompt?.index === index ? "linked-focus-card" : ""}" data-workflow-index="${index}">
-      <strong>第 ${index + 1} 步 · ${escapeHtml(normalizeWorkflowPromptTitle(item, index))}</strong>
-      <span>这是整条技能在第 ${index + 1} 步要交给 AI 执行的优化版 Prompt。</span>
-      <span>${escapeHtml(item.prompt || "")}</span>
-      <div class="meta-block">
-        ${item.quality ? `<small>质量分：${escapeHtml(String(item.quality.score))} · 优先级：${escapeHtml(item.quality.priority)}</small>` : ""}
-        ${item.sourceTurnIds?.length ? `<small>来源轮次：${escapeHtml(item.sourceTurnIds.join(", "))}</small>` : "<small>还没有关联到来源轮次。</small>"}
-      </div>
-      <div class="action-row">
-        <button type="button" data-action="edit-workflow-prompt" data-index="${index}">编辑</button>
-        <button type="button" data-action="optimize-workflow-prompt-inline" data-index="${index}">一键优化</button>
-        <button type="button" data-action="run-workflow-prompt-check" data-index="${index}">检查这条工作流 Prompt</button>
-      </div>
-      ${item.sourceTurnIds?.length ? `<div class="action-row">${item.sourceTurnIds.map((turnId) => `<button type="button" data-action="jump-to-turn" data-turn-id="${escapeHtml(turnId)}">定位到 ${escapeHtml(turnId)}</button>`).join("")}</div>` : ""}
-    </article>
-  `).join("");
-  renderWorkflowStatus();
 }
 
 function renderWorkflowPromptEditor(item, index, promptCheck = null) {
@@ -904,7 +849,6 @@ function focusWorkflowIndex(index) {
   selectedWorkflowPrompt = { index };
   const asset = getCurrentDetailAsset();
   if (asset && selectedDetail && selectedDetail.kind !== "conversation") {
-    renderWorkflowPromptsPreview(asset.workflowPrompts || []);
     renderStepMapPreview(asset.stepSources || [], asset.steps || []);
     renderWorkflowAlignment();
     renderWorkflowStatus();
