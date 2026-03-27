@@ -73,10 +73,6 @@
         <p class="muted" data-detail-note hidden>
           这些内容是 AI 或本地规则自动生成的草稿建议，正式使用前请先编辑确认。
         </p>
-        <section class="card skill-overview-panel" data-skill-overview-panel hidden>
-          <h3>技能摘要</h3>
-          <div class="skill-overview-grid" data-skill-overview-content></div>
-        </section>
         <section class="status-line workflow-status-line" data-workflow-status hidden>
           <strong data-workflow-status-title>当前还没有选中工作流步骤</strong>
           <span data-workflow-status-text>点开某条工作流 Prompt 或步骤后，这里会显示当前对照关系。</span>
@@ -119,35 +115,27 @@
           </label>
 
           <label class="field-label">
-            <span>使用场景</span>
+            <span>Scenario</span>
             <input name="scenario" type="text" list="skillclip-scenario-options" />
           </label>
 
           <label class="field-label">
-            <span>适用场景</span>
+            <span>Use When</span>
             <textarea name="useWhen" rows="3"></textarea>
           </label>
 
           <label class="field-label">
-            <span>不适用</span>
+            <span>Not For</span>
             <textarea name="notFor" rows="3"></textarea>
           </label>
 
           <label class="field-label">
-            <span>目标</span>
+            <span>Goal</span>
             <textarea name="goal" rows="3"></textarea>
           </label>
 
           <label class="field-label">
-            <span>步骤（每行一步）</span>
-            <textarea name="steps" rows="6"></textarea>
-          </label>
-          <p class="muted detail-inline-note">
-            这里写的是“你执行这条工作流时要做的步骤”，不是把 Prompt 原文重复写一遍。
-          </p>
-
-          <label class="field-label">
-            <span>输出格式</span>
+            <span>Output Format</span>
             <input name="outputFormat" type="text" />
           </label>
 
@@ -163,18 +151,10 @@
           </div>
         </form>
 
-        <section class="detail-source-block detail-fold-workflow workflow-alignment-panel workflow-primary-panel" data-workflow-alignment-panel hidden>
-          <h3>工作流对照</h3>
-          <p class="muted detail-inline-note">
-            左边是给 AI 使用的工作流 Prompt，右边是你执行这条 workflow 时的人类步骤。两边一一对应。
-          </p>
-          <div data-workflow-alignment-content class="stack"></div>
-        </section>
-
         <section class="detail-source-block detail-fold-workflow workflow-runbook-panel workflow-primary-panel" data-runbook-primary-panel hidden>
           <h3>运行手册</h3>
           <p class="muted detail-inline-note">
-            这是整条技能最后给 AI 执行的完整 SOP 文本。建议先看上面的 Prompt 和 Step 对照，再看这里的完整运行手册。
+            这是整条技能最后给 AI 执行的完整 SOP 文本。
           </p>
           <div data-runbook-primary-content class="stack"></div>
         </section>
@@ -200,6 +180,14 @@
           </form>
           <div data-workflow-prompt-check class="stack"></div>
         </section>
+
+        <details class="detail-source-block detail-fold detail-fold-workflow workflow-alignment-panel workflow-primary-panel" data-workflow-alignment-panel hidden>
+          <summary>工作流对照（可展开）</summary>
+          <p class="muted detail-inline-note">
+            这里保留 Prompt 和步骤的对应关系，主要用于你需要核对来源时再展开看。
+          </p>
+          <div data-workflow-alignment-content class="stack"></div>
+        </details>
 
         <section class="detail-source-block detail-fold-validation" data-compare-panel hidden>
           <h3>基础版本对比</h3>

@@ -6,6 +6,65 @@ let selectedConversationIds = new Set();
 let latestRunCheck = null;
 let selectedWorkflowPrompt = null;
 
+function parseWorkflowPromptSections(prompt = "") {
+  const lines = String(prompt || "").split("\n");
+  const sections = { body: [] };
+  let current = "body";
+
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (/^#\s*(本步动作|步骤动作|当前动作|TASK|任务|总体任务)$/i.test(trimmed)) {
+      current = "task";
+      sections[current] = [];
+      return;
+    }
+    if (/^#\s*(本步上下文|当前上下文|CONTEXT|上下文)$/i.test(trimmed)) {
+      current = "context";
+      sections[current] = [];
+      return;
+    }
+    if (/^#\s*(本步要求|当前要求|REQUIREMENTS|要求)$/i.test(trimmed)) {
+      current = "requirements";
+      sections[current] = [];
+      return;
+    }
+    if (trimmed) {
+      sections[current] ||= [];
+      sections[current].push(trimmed);
+    }
+  });
+
+  return {
+    task: (sections.task || []).join(" "),
+    context: (sections.context || []).join(" "),
+    body: (sections.body || []).join(" ")
+  };
+}
+
+function normalizeWorkflowPromptTitle(item, index = 0) {
+  const sections = parseWorkflowPromptSections(item?.prompt || "");
+  const task = String(sections.task || "").replace(/\s+/g, " ").trim();
+  if (task) {
+    return task.slice(0, 20);
+  }
+
+  const currentTitle = String(item?.title || "").replace(/\s+/g, " ").trim();
+  if (
+    currentTitle &&
+    !/^(现在|可以|行，那|好的|然后|我想|你帮我|帮我|请你|请帮我)/.test(currentTitle)
+  ) {
+    return currentTitle.slice(0, 20);
+  }
+
+  const context = String(sections.context || sections.body || "").replace(/\s+/g, " ").trim();
+  if (/背景|约束|限制|对象|嘉宾/.test(context)) return "补充关键背景与约束";
+  if (/优化|调整|改写|重写|深入|细化/.test(context)) return "优化当前结果的结构细节";
+  if (/输出|整理|生成|提纲|方案|结果/.test(context)) return "整理并输出最终结果";
+  if (/目标|主题|方向|范围/.test(context)) return "明确任务目标与范围";
+
+  return `第 ${index + 1} 步工作流 Prompt`;
+}
+
 async function load() {
   const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_STATE });
   const state = response.result;
@@ -69,7 +128,7 @@ function renderWorkflowStatus() {
   const prompt = asset.workflowPrompts[index];
   const step = asset.stepSources?.[index]?.step || asset.steps?.[index] || "";
   title.textContent = `当前选中：第 ${index + 1} 条 Prompt / 第 ${index + 1} 步`;
-  text.textContent = `${prompt?.title || "未命名工作流 Prompt"} -> ${step || "还没有步骤内容"}`;
+  text.textContent = `${normalizeWorkflowPromptTitle(prompt, index)}${step ? ` -> ${step}` : ""}`;
 }
 
 function renderRunbookPrimary(item) {
@@ -102,36 +161,7 @@ function setFeedback(message) {
   }
 }
 
-function renderSkillOverview(item, kind) {
-  const panel = document.querySelector("[data-skill-overview-panel]");
-  const content = document.querySelector("[data-skill-overview-content]");
-  if (!(panel instanceof HTMLElement) || !content) {
-    return;
-  }
-
-  if (!item || kind === "conversation") {
-    panel.hidden = true;
-    content.innerHTML = "";
-    return;
-  }
-
-  const cards = [
-    ["使用场景", item.scenario || item.scenarioOverride || "待补充"],
-    ["适用场景", item.useWhen || "待补充"],
-    ["不适用", item.notFor || "待补充"],
-    ["目标", item.goal || item.changeSummary || "待补充"],
-    ["输出格式", item.outputFormat || "待补充"],
-    ["成功标准", Array.isArray(item.successCriteria) && item.successCriteria.length ? item.successCriteria.join("；") : "待补充"]
-  ];
-
-  panel.hidden = false;
-  content.innerHTML = cards.map(([label, value]) => `
-    <article class="list-card skill-overview-card">
-      <strong>${escapeHtml(label)}</strong>
-      <span>${escapeHtml(value)}</span>
-    </article>
-  `).join("");
-}
+function renderSkillOverview() {}
 
 async function sendToActiveTab(message) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -514,7 +544,6 @@ function showDetailPanel(item, kind) {
   form.elements.useWhen.value = item.useWhen || "";
   form.elements.notFor.value = item.notFor || "";
   form.elements.goal.value = item.goal || item.changeSummary || "";
-  form.elements.steps.value = (item.steps || []).join("\n");
   form.elements.outputFormat.value = item.outputFormat || "";
   form.elements.successCriteria.value = (item.successCriteria || []).join("\n");
   renderExtractionPreview(item.extraction);
@@ -712,11 +741,10 @@ function renderWorkflowPromptsPreview(items) {
   panel.hidden = false;
   content.innerHTML = items.map((item, index) => `
     <article class="list-card workflow-card ${selectedWorkflowPrompt?.index === index ? "linked-focus-card" : ""}" data-workflow-index="${index}">
-      <strong>第 ${index + 1} 条 · ${escapeHtml(item.title || `工作流步骤 ${index + 1}`)}</strong>
-      <span>这一条对应工作流中的第 ${index + 1} 步，标题应该描述“要完成的动作”。</span>
+      <strong>第 ${index + 1} 步 · ${escapeHtml(normalizeWorkflowPromptTitle(item, index))}</strong>
+      <span>这是整条技能在第 ${index + 1} 步要交给 AI 执行的优化版 Prompt。</span>
       <span>${escapeHtml(item.prompt || "")}</span>
       <div class="meta-block">
-        <small>对应步骤：第 ${index + 1} 步</small>
         ${item.quality ? `<small>质量分：${escapeHtml(String(item.quality.score))} · 优先级：${escapeHtml(item.quality.priority)}</small>` : ""}
         ${item.sourceTurnIds?.length ? `<small>来源轮次：${escapeHtml(item.sourceTurnIds.join(", "))}</small>` : "<small>还没有关联到来源轮次。</small>"}
       </div>
@@ -724,7 +752,6 @@ function renderWorkflowPromptsPreview(items) {
         <button type="button" data-action="edit-workflow-prompt" data-index="${index}">编辑</button>
         <button type="button" data-action="optimize-workflow-prompt-inline" data-index="${index}">一键优化</button>
         <button type="button" data-action="run-workflow-prompt-check" data-index="${index}">检查这条工作流 Prompt</button>
-        <button type="button" data-action="focus-workflow-step" data-index="${index}">查看对应步骤</button>
       </div>
       ${item.sourceTurnIds?.length ? `<div class="action-row">${item.sourceTurnIds.map((turnId) => `<button type="button" data-action="jump-to-turn" data-turn-id="${escapeHtml(turnId)}">定位到 ${escapeHtml(turnId)}</button>`).join("")}</div>` : ""}
     </article>
@@ -751,7 +778,7 @@ function renderWorkflowPromptEditor(item, index, promptCheck = null) {
   selectedWorkflowPrompt = { index };
   panel.hidden = false;
   form.elements.index.value = String(index);
-  form.elements.title.value = item.title || "";
+  form.elements.title.value = normalizeWorkflowPromptTitle(item, index);
   form.elements.prompt.value = item.prompt || "";
   checkNode.innerHTML = promptCheck
     ? `
@@ -801,7 +828,7 @@ function renderRunCheckPreview(result) {
       </div>
       ${result.promptChecks.map((item, index) => `
         <article class="list-card">
-          <strong>第 ${index + 1} 条 · ${escapeHtml(item.title || `工作流 Prompt ${index + 1}`)}</strong>
+          <strong>第 ${index + 1} 条 · ${escapeHtml(normalizeWorkflowPromptTitle(item, index))}</strong>
           <span>${escapeHtml(item.ok ? "可用" : "还需要继续优化")}</span>
           <div class="meta-block">
             <small>${escapeHtml(item.summary || "")}</small>
@@ -858,9 +885,8 @@ function renderStepMapPreview(stepSources, fallbackItems = []) {
     <article class="list-card workflow-step-card ${selectedWorkflowPrompt?.index === index ? "linked-focus-card" : ""}" data-step-index="${index}">
       <strong>第 ${index + 1} 步</strong>
       <span>${escapeHtml(item.step || "")}</span>
-      ${workflowPrompts[index]?.title ? `<div class="meta-block"><small>对应工作流 Prompt</small><small>${escapeHtml(workflowPrompts[index].title)}</small></div>` : ""}
+      ${workflowPrompts[index] ? `<div class="meta-block"><small>对应工作流 Prompt</small><small>${escapeHtml(normalizeWorkflowPromptTitle(workflowPrompts[index], index))}</small></div>` : ""}
       <div class="action-row">
-        <button type="button" data-action="focus-workflow-prompt" data-index="${index}">查看对应 Prompt</button>
         ${item.sourceTurnIds?.length ? item.sourceTurnIds.map((turnId) => `<button type="button" data-action="jump-to-turn" data-turn-id="${escapeHtml(turnId)}">定位到 ${escapeHtml(turnId)}</button>`).join("") : ""}
       </div>
       ${item.sourcePreview ? `<div class="meta-block"><small>来源摘要</small><small>${escapeHtml(item.sourcePreview)}</small></div>` : ""}
@@ -912,24 +938,20 @@ function renderWorkflowAlignment() {
   content.innerHTML = prompts.map((prompt, index) => `
     <article class="list-card workflow-alignment-row ${selectedWorkflowPrompt?.index === index ? "linked-focus-card" : ""}">
       <div class="workflow-alignment-col">
-        <strong>工作流 Prompt ${index + 1}</strong>
-        <span>${escapeHtml(prompt.title || `工作流 Prompt ${index + 1}`)}</span>
+        <strong>第 ${index + 1} 步 Prompt</strong>
+        <span>${escapeHtml(normalizeWorkflowPromptTitle(prompt, index))}</span>
         <div class="meta-block">
           <small>${escapeHtml(prompt.prompt || "")}</small>
         </div>
         <div class="action-row">
           <button type="button" data-action="edit-workflow-prompt" data-index="${index}">编辑</button>
-          <button type="button" data-action="focus-workflow-step" data-index="${index}">查看对应步骤</button>
         </div>
       </div>
       <div class="workflow-alignment-col">
-        <strong>执行步骤 ${index + 1}</strong>
+        <strong>第 ${index + 1} 步说明</strong>
         <span>${escapeHtml(steps[index]?.step || asset.steps?.[index] || "还没有这一步的说明")}</span>
         <div class="meta-block">
           <small>${escapeHtml(steps[index]?.sourcePreview || "这一步还没有来源摘要。")}</small>
-        </div>
-        <div class="action-row">
-          <button type="button" data-action="focus-workflow-prompt" data-index="${index}">查看对应 Prompt</button>
         </div>
       </div>
     </article>
@@ -1647,10 +1669,7 @@ document.querySelector("[data-detail-form]")?.addEventListener("submit", async (
       .split("\n")
       .map((item) => item.trim())
       .filter(Boolean),
-    steps: String(formData.get("steps") || "")
-      .split("\n")
-      .map((item) => item.trim())
-      .filter(Boolean)
+    steps: selectedDetail?.steps || []
   };
   const kind = String(formData.get("kind") || "");
 

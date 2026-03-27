@@ -149,7 +149,22 @@ function parseStructuredPromptSections(prompt = "") {
       sections[current] = [];
       return;
     }
+    if (/^#\s*(本步动作|步骤动作|当前动作)$/i.test(trimmed)) {
+      current = "task";
+      sections[current] = [];
+      return;
+    }
+    if (/^#\s*(总体任务)$/i.test(trimmed)) {
+      current = "task";
+      sections[current] = [];
+      return;
+    }
     if (/^#\s*(CONTEXT|上下文)$/i.test(trimmed)) {
+      current = "context";
+      sections[current] = [];
+      return;
+    }
+    if (/^#\s*(本步上下文|当前上下文)$/i.test(trimmed)) {
       current = "context";
       sections[current] = [];
       return;
@@ -159,7 +174,17 @@ function parseStructuredPromptSections(prompt = "") {
       sections[current] = [];
       return;
     }
+    if (/^#\s*(本步要求|当前要求)$/i.test(trimmed)) {
+      current = "requirements";
+      sections[current] = [];
+      return;
+    }
     if (/^#\s*(OUTPUT FORMAT|输出格式)$/i.test(trimmed)) {
+      current = "output";
+      sections[current] = [];
+      return;
+    }
+    if (/^#\s*(统一输出要求)$/i.test(trimmed)) {
       current = "output";
       sections[current] = [];
       return;
@@ -230,7 +255,7 @@ function deriveWorkflowPromptLabel(text = "", scenario = "") {
     if (/总结|结尾|closing/i.test(clean)) return "设计结尾问题和收束方式，方便主持人收尾";
     if (/目标|主题|方向/i.test(clean)) return "先明确访谈目标、主题和这期内容的核心方向";
   }
-  return inferWorkflowActionTitle(clean, scenario, 0);
+  return trimWorkflowTitle(inferWorkflowActionTitle(clean, scenario, 0));
 }
 
 export function optimizePromptLocally(conversation) {
@@ -439,6 +464,11 @@ function inferWorkflowPrompts(turns = [], scenario = "", selectedText = "") {
 }
 
 function inferWorkflowPromptTitle(text, index, scenario) {
+  const structuredLabel = deriveWorkflowPromptLabel(text, scenario);
+  if (structuredLabel) {
+    return structuredLabel;
+  }
+
   if (scenario === "Podcast interview planning") {
     if (index === 0) {
       return "先明确这期播客的主题、目标和讨论方向";
@@ -472,7 +502,7 @@ function inferWorkflowPromptTitle(text, index, scenario) {
     return index === 0 ? "先明确产品问题、目标用户和要解决的场景" : `继续细化 PRD 内容的第 ${index + 1} 步`;
   }
 
-  return deriveWorkflowPromptLabel(text, scenario) || `继续完成这条工作流的第 ${index + 1} 步`;
+  return trimWorkflowTitle(`完成这条工作流的第 ${index + 1} 步`);
 }
 
 function optimizePromptText(text, scenario, options = {}) {
