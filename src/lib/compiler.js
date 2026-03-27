@@ -253,7 +253,11 @@ export function optimizePromptLocally(conversation) {
 }
 
 export function optimizeWorkflowPromptLocally(prompt, scenario = "") {
-  const optimizedPrompt = optimizePromptText(prompt?.prompt || prompt?.text || "", scenario);
+  const optimizedPrompt = optimizePromptText(prompt?.prompt || prompt?.text || "", scenario, {
+    workflow: true,
+    includeSharedFrame: false,
+    focusTitle: prompt?.title || ""
+  });
   return {
     optimizedTitle: inferWorkflowPromptTitle(prompt?.prompt || prompt?.text || "", 0, scenario),
     optimizedPrompt,
@@ -414,14 +418,22 @@ function inferWorkflowPrompts(turns = [], scenario = "", selectedText = "") {
   if (!userTurns.length && selectedText) {
     return [{
       title: inferWorkflowPromptTitle(selectedText, 0, scenario),
-      prompt: optimizePromptText(selectedText, scenario),
+      prompt: optimizePromptText(selectedText, scenario, {
+        workflow: true,
+        includeSharedFrame: true,
+        focusTitle: inferWorkflowPromptTitle(selectedText, 0, scenario)
+      }),
       sourceTurnIds: []
     }];
   }
 
   return userTurns.map((turn, index) => ({
     title: inferWorkflowPromptTitle(turn.text, index, scenario),
-    prompt: optimizePromptText(turn.text, scenario),
+    prompt: optimizePromptText(turn.text, scenario, {
+      workflow: true,
+      includeSharedFrame: index === 0,
+      focusTitle: inferWorkflowPromptTitle(turn.text, index, scenario)
+    }),
     sourceTurnIds: turn.id ? [turn.id] : []
   }));
 }
@@ -463,7 +475,7 @@ function inferWorkflowPromptTitle(text, index, scenario) {
   return deriveWorkflowPromptLabel(text, scenario) || `继续完成这条工作流的第 ${index + 1} 步`;
 }
 
-function optimizePromptText(text, scenario) {
+function optimizePromptText(text, scenario, options = {}) {
   const clean = String(text || "")
     .replace(/\s+/g, " ")
     .trim();
@@ -476,6 +488,35 @@ function optimizePromptText(text, scenario) {
   const task = inferPromptTask(scenario);
   const requirements = inferPromptRequirements(scenario);
   const outputFormat = inferPromptOutputFormat(scenario);
+  const focusTitle = trimWorkflowTitle(options.focusTitle || deriveWorkflowPromptLabel(clean, scenario) || inferWorkflowActionTitle(clean, scenario, 0));
+
+  if (options.workflow) {
+    const base = [
+      options.includeSharedFrame
+        ? [
+          "# 全局角色",
+          role,
+          "",
+          "# 总体任务",
+          task,
+          "",
+          "# 统一输出要求",
+          outputFormat,
+          ""
+        ].join("\n")
+        : "",
+      "# 本步动作",
+      focusTitle || "完成当前这一步",
+      "",
+      "# 本步上下文",
+      clean,
+      "",
+      "# 本步要求",
+      requirements.map((item) => `- ${item}`).join("\n")
+    ].filter(Boolean).join("\n");
+
+    return base;
+  }
 
   return [
     "# 角色",
@@ -541,26 +582,59 @@ function inferWorkflowActionTitle(text = "", scenario = "", index = 0) {
   }
 
   if (/先|首先/.test(normalized)) {
-    return "先明确当前任务的目标、范围和预期输出";
+    return "明确任务目标、范围与预期输出";
   }
   if (/背景|约束|限制|补充|context|constraint/i.test(normalized)) {
-    return "再补充关键背景、限制条件和判断标准";
+    return "补充关键背景、限制条件与判断标准";
   }
   if (/改|优化|重写|调整|更具体|更清晰|polish|refine/i.test(normalized)) {
-    return "再基于已有结果继续优化表达、结构和细节";
+    return "优化现有结果的表达、结构与细节";
   }
   if (/总结|整理|输出|给我一版|生成|写出|产出/i.test(normalized)) {
-    return "最后整理成一份结构清晰、可以直接使用的结果";
+    return "整理并输出可直接使用的最终结果";
   }
   if (/验证|检查|review|check/i.test(normalized)) {
-    return "再检查当前结果是否满足要求并补齐缺口";
+    return "检查当前结果并补齐关键缺口";
   }
 
   if (scenario === "Reusable AI workflow" || scenario === "General AI workflow") {
-    return `继续推进这条工作流的第 ${index + 1} 步`;
+    return `推进工作流的第 ${index + 1} 步`;
   }
 
-  return `继续完成“${scenario}”的第 ${index + 1} 步`;
+  return trimWorkflowTitle(`完成“${scenario}”的第 ${index + 1} 步`);
+}
+
+function trimWorkflowTitle(title = "") {
+  const normalized = String(title || "").replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return "";
+  }
+
+  const preferred = normalized
+    .replace(/^先|^再|^最后/g, "")
+    .replace(/，/g, "、");
+
+  const candidates = [
+    preferred,
+    preferred.replace(/和这期内容的核心方向/g, "与核心方向"),
+    preferred.replace(/让访谈更具体/g, "让访谈更具体"),
+    preferred.replace(/让对话自然进入主题/g, "让对话自然进入主题"),
+    preferred.replace(/把对话继续往深处推进/g, "继续深挖对话"),
+    preferred.replace(/方便主持人收尾/g, "完成收尾设计")
+  ];
+
+  const concise = candidates.find((item) => item.length <= 20);
+  if (concise) {
+    return concise;
+  }
+
+  return candidates[0]
+    .replace(/和这期内容的核心方向/g, "与核心方向")
+    .replace(/关键背景、/g, "")
+    .replace(/、限制条件和判断标准/g, "与判断标准")
+    .replace(/表达、结构和细节/g, "结构与细节")
+    .replace(/一份结构清晰、可以直接使用的/g, "")
+    .slice(0, 20);
 }
 
 function inferPromptRequirements(scenario) {
@@ -936,9 +1010,19 @@ function buildPromptTemplate(selectedText, inputs, workflowPrompts = []) {
     : "- 主题：{{topic}}";
 
   if (workflowPrompts.length) {
+    const sharedSections = parseStructuredPromptSections(workflowPrompts[0]?.prompt || "");
+    const sharedRole = sharedSections.role || "你是一位擅长把原始素材整理成可复用工作流结果的 AI 助手。";
+    const sharedTask = sharedSections.task || "按照下面的步骤完成整条工作流，并输出最终可直接使用的结果。";
+    const sharedOutput = sharedSections.output || "请输出结构清晰、可直接复用的最终结果。";
     return [
       "# SOP 概览",
       "按照下面的标准操作流程执行任务，确保输出可直接复用，而不是一次性回答。",
+      "",
+      "# 全局角色",
+      sharedRole,
+      "",
+      "# 总体任务",
+      sharedTask,
       "",
       "# 前置输入",
       inputSection,
@@ -951,6 +1035,9 @@ function buildPromptTemplate(selectedText, inputs, workflowPrompts = []) {
       workflowPrompts
         .map((item, index) => `## 第 ${index + 1} 步：${item.title}\n${compactWorkflowPromptForRunbook(item, index, workflowPrompts[index - 1])}`)
         .join("\n\n"),
+      "",
+      "# 统一输出要求",
+      sharedOutput,
       "",
       "# 失败回退",
       "- 如果某一步信息不足，先指出缺失项，再基于已有信息给出可执行的临时版本。",

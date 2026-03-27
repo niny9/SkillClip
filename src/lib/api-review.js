@@ -34,7 +34,9 @@ export async function extractSkillDraftWithApi(payload, fallbackDraft, settings)
             "workflowPrompts must be an array of { title, prompt, sourceTurnIds } with concise optimized prompts.",
             "Each workflow prompt should read like a high-quality reusable prompt, not copied chat text.",
             "workflowPrompts should correspond to the meaningful user turns in order whenever possible.",
-            "workflow prompt titles must be complete, natural Chinese action titles, not truncated fragments.",
+            "workflow prompt titles must be complete, natural Chinese action titles within 20 Chinese characters whenever possible, not truncated fragments.",
+            "When the prompts belong to one whole workflow, treat shared role, shared mission, and shared output format as global context instead of repeating them in every step.",
+            "Only the first workflow prompt may include the full global frame. Later workflow prompts should focus on the current step action, extra context, and step-specific requirements.",
             "steps should describe the execution workflow for the user or operator, not say 'execute this prompt'.",
             "steps should align with workflowPrompts instead of repeating the raw chat.",
             "promptTemplate must be a structured Markdown runbook with sections such as IDENTITY and PURPOSE, INPUTS, STEPS, and OUTPUT INSTRUCTIONS.",
@@ -209,8 +211,10 @@ export async function optimizeWorkflowPromptWithApi(asset, workflowPrompt, setti
           content: [
             "You improve one workflow prompt inside a reusable AI skill.",
             "Return strict JSON with keys: optimizedTitle, optimizedPrompt.",
-            "optimizedTitle must stay concise and step-like.",
+            "optimizedTitle must stay concise, complete, and usually within 20 Chinese characters.",
             "optimizedPrompt must be a stronger, more reusable version of the workflow prompt.",
+            "Do not simply truncate the source text to make the title.",
+            "Assume the workflow already has a shared global role and output target. Avoid repeating identical global sections unless they are necessary for this specific step.",
             "Keep the prompt structured and practical."
           ].join(" ")
         },

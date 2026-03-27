@@ -146,17 +146,6 @@
             这里写的是“你执行这条工作流时要做的步骤”，不是把 Prompt 原文重复写一遍。
           </p>
 
-          <details class="raw-json-wrap">
-            <summary>运行手册（自动生成）</summary>
-            <label class="field-label">
-              <span>运行手册</span>
-              <textarea name="promptTemplate" rows="8"></textarea>
-            </label>
-            <p class="muted detail-inline-note">
-              这里是最终给 AI 执行的完整运行文本，会把输入、步骤、输出要求和检查项组织成一份 SOP。
-            </p>
-          </details>
-
           <label class="field-label">
             <span>输出格式</span>
             <input name="outputFormat" type="text" />
@@ -189,14 +178,6 @@
           </p>
           <div data-runbook-primary-content class="stack"></div>
         </section>
-
-        <details class="detail-source-block detail-fold detail-fold-workflow workflow-secondary-panel" data-workflow-prompts-panel hidden>
-          <summary>工作流 Prompt（辅助查看）</summary>
-          <p class="muted detail-inline-note">
-            这里保留每一步真正给 AI 使用的优化版 Prompt，适合你在需要时再展开检查或编辑。
-          </p>
-          <div data-workflow-prompts-content class="stack"></div>
-        </details>
 
         <section class="detail-source-block detail-fold-workflow" data-workflow-editor-panel hidden>
           <h3>工作流 Prompt 编辑</h3>

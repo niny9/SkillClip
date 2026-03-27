@@ -514,7 +514,6 @@ function showDetailPanel(item, kind) {
   form.elements.useWhen.value = item.useWhen || "";
   form.elements.notFor.value = item.notFor || "";
   form.elements.goal.value = item.goal || item.changeSummary || "";
-  form.elements.promptTemplate.value = item.promptTemplate || "";
   form.elements.steps.value = (item.steps || []).join("\n");
   form.elements.outputFormat.value = item.outputFormat || "";
   form.elements.successCriteria.value = (item.successCriteria || []).join("\n");
@@ -1642,7 +1641,7 @@ document.querySelector("[data-detail-form]")?.addEventListener("submit", async (
     useWhen: String(formData.get("useWhen") || ""),
     notFor: String(formData.get("notFor") || ""),
     goal: String(formData.get("goal") || ""),
-    promptTemplate: String(formData.get("promptTemplate") || ""),
+    promptTemplate: selectedDetail?.promptTemplate || "",
     outputFormat: String(formData.get("outputFormat") || ""),
     successCriteria: String(formData.get("successCriteria") || "")
       .split("\n")
