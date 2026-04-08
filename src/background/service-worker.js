@@ -904,6 +904,7 @@ function rebuildAssetAfterWorkflowPromptEdit(asset, payload, settings) {
 
   const nextAsset = {
     ...asset,
+    scenario: rebuilt.scenario,
     workflowPrompts: rebuilt.workflowPrompts,
     inputs: rebuilt.inputs,
     steps: rebuilt.steps,
@@ -911,10 +912,10 @@ function rebuildAssetAfterWorkflowPromptEdit(asset, payload, settings) {
     promptTemplate: rebuilt.promptTemplate,
     outputFormat: rebuilt.outputFormat,
     example: selectedText,
-    useWhen: asset.useWhen || rebuilt.useWhen,
-    notFor: asset.notFor || rebuilt.notFor,
-    goal: asset.goal || rebuilt.goal,
-    whatItDoes: asset.whatItDoes || rebuilt.whatItDoes,
+    useWhen: rebuilt.useWhen,
+    notFor: rebuilt.notFor,
+    goal: rebuilt.goal,
+    whatItDoes: rebuilt.whatItDoes,
     updatedAt: nowIso()
   };
 

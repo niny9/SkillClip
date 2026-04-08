@@ -16,7 +16,43 @@ function extractVariablesFromText(text) {
   }));
 }
 
+const SCENARIO_DISPLAY = {
+  "Social profile writing": "社交名片整理",
+  "Podcast interview planning": "播客访谈策划",
+  "Interview outline generation": "访谈提纲整理",
+  "Product PRD writing": "产品 PRD 撰写",
+  "Marketing copy generation": "营销文案生成",
+  "SQL debugging": "SQL 排错",
+  "Research synthesis": "研究总结",
+  "Meeting summary": "会议纪要",
+  "Writing assistant": "写作助手",
+  "Coding workflow": "代码工作流",
+  "Learning plan": "学习计划",
+  "Content repurposing": "内容二次创作",
+  "Social post generation": "社交平台内容生成",
+  "Video script writing": "视频脚本撰写",
+  "Sales outreach": "销售触达文案",
+  "Customer support reply": "客服回复",
+  "Translation refinement": "翻译润色",
+  "Prompt optimization": "提示词优化",
+  "Workflow automation": "工作流自动化",
+  "General AI workflow": "通用 AI 工作流",
+  "Reusable AI workflow": "可复用 AI 工作流"
+};
+
+function scenarioLabel(scenario = "") {
+  return SCENARIO_DISPLAY[scenario] || scenario || "通用工作流";
+}
+
 function inferScenarioInputs(scenario) {
+  if (scenario === "Social profile writing") {
+    return [
+      { key: "person_name", label: "姓名", required: false, description: "个人姓名或对外名称" },
+      { key: "core_identity", label: "核心身份", required: true, description: "最想强调的身份定位" },
+      { key: "target_platform", label: "目标平台", required: false, description: "如 X、LinkedIn、社交名片" },
+      { key: "tone", label: "语气风格", required: false, description: "如专业、克制、有锋芒" }
+    ];
+  }
   if (scenario === "Podcast interview planning") {
     return [
       { key: "topic", label: "Topic", required: true, description: "Podcast topic or discussion theme" },
@@ -80,20 +116,8 @@ function inferSkillName(payload, scenario) {
     .replace(/[：:，,。.？?！!]/g, " ")
     .trim();
 
-  if (scenario === "Podcast interview planning") {
-    return "播客访谈提纲技能";
-  }
-  if (scenario === "Interview outline generation") {
-    return "访谈提纲整理技能";
-  }
-  if (scenario === "Product PRD writing") {
-    return "产品 PRD 生成技能";
-  }
-  if (scenario === "Marketing copy generation") {
-    return "营销文案生成技能";
-  }
-  if (scenario === "SQL debugging") {
-    return "SQL 排错技能";
+  if (scenario && scenario !== "Reusable AI workflow" && scenario !== "General AI workflow") {
+    return `${scenarioLabel(scenario)}技能`;
   }
 
   const candidate = clean.split(" ").filter(Boolean).slice(0, 6).join(" ");
@@ -104,20 +128,8 @@ function inferSkillName(payload, scenario) {
 }
 
 function inferPromptName(scenario, text = "") {
-  if (scenario === "Podcast interview planning") {
-    return "播客访谈提纲 Prompt";
-  }
-  if (scenario === "Interview outline generation") {
-    return "访谈提纲整理 Prompt";
-  }
-  if (scenario === "Product PRD writing") {
-    return "产品 PRD Prompt";
-  }
-  if (scenario === "Marketing copy generation") {
-    return "营销文案 Prompt";
-  }
-  if (scenario === "SQL debugging") {
-    return "SQL 排错 Prompt";
+  if (scenario && scenario !== "Reusable AI workflow" && scenario !== "General AI workflow") {
+    return `${scenarioLabel(scenario)}内容`;
   }
 
   const clean = String(text || "")
@@ -295,20 +307,31 @@ function inferScenario({ platform, selectedText, turns, title }) {
     .join(" ")
     .toLowerCase();
 
-  if (base.includes("podcast") || base.includes("播客") || base.includes("访谈") || base.includes("interview outline")) {
-    return "Podcast interview planning";
-  }
-  if (base.includes("提纲") || base.includes("outline") || base.includes("questions")) {
-    return "Interview outline generation";
-  }
-  if (base.includes("sql")) {
-    return "SQL debugging";
-  }
-  if (base.includes("prd") || base.includes("product requirement")) {
-    return "Product PRD writing";
-  }
-  if (base.includes("title") || base.includes("xiaohongshu")) {
-    return "Marketing copy generation";
+  const score = (keywords = []) => keywords.reduce((sum, keyword) => (
+    base.includes(keyword) ? sum + 1 : sum
+  ), 0);
+
+  const socialScore = score([
+    "社交名片", "个人简介", "个人介绍", "bio", "profile", "linkedin", "x简介", "x 个人简介", "自我介绍", "介绍我",
+    "个人品牌", "名片", "一句话介绍", "简介", "headline", "about me"
+  ]);
+  const podcastScore = score(["podcast", "播客", "访谈", "采访提纲", "interview outline", "主持人", "嘉宾"]);
+  const outlineScore = score(["提纲", "outline", "questions", "问题设计", "访谈问题"]);
+  const sqlScore = score(["sql", "数据库", "query", "报错 sql"]);
+  const prdScore = score(["prd", "product requirement", "需求文档", "产品需求"]);
+  const marketingScore = score(["title", "xiaohongshu", "文案", "小红书", "营销", "广告语", "slogan"]);
+
+  const ranked = [
+    ["Social profile writing", socialScore],
+    ["Podcast interview planning", podcastScore],
+    ["Interview outline generation", outlineScore],
+    ["SQL debugging", sqlScore],
+    ["Product PRD writing", prdScore],
+    ["Marketing copy generation", marketingScore]
+  ].sort((a, b) => b[1] - a[1]);
+
+  if (ranked[0][1] > 0) {
+    return ranked[0][0];
   }
   if (platform === "claude" || platform === "chatgpt") {
     return "General AI workflow";
@@ -327,6 +350,9 @@ function inferOutputFormat(scenario) {
   if (scenario === "Marketing copy generation") {
     return "多个标题或文案版本";
   }
+  if (scenario === "Social profile writing") {
+    return "可直接复制使用的个人简介或社交名片文案";
+  }
   return "结构化结果";
 }
 
@@ -343,6 +369,9 @@ function inferPromptOutputFormat(scenario) {
   if (scenario === "SQL debugging") {
     return "分步骤诊断说明和修正后的 SQL";
   }
+  if (scenario === "Social profile writing") {
+    return "简洁的 Markdown 结果，包含一句话定位、核心经历和可直接展示的简介版本";
+  }
   return "简洁、结构化的 Markdown 结果";
 }
 
@@ -358,6 +387,9 @@ function inferGoal(scenario, platform) {
   }
   if (scenario === "Marketing copy generation") {
     return "生成格式清晰、后续可以反复复用的营销文案。";
+  }
+  if (scenario && scenario !== "Reusable AI workflow" && scenario !== "General AI workflow") {
+    return `把零散素材整理成可直接使用、可反复复用的${scenarioLabel(scenario)}结果。`;
   }
   return `把从${platform || "AI 平台"}捕获到的原始对话整理成可复用的工作流。`;
 }
@@ -378,6 +410,9 @@ function inferWhatItDoes(scenario) {
   if (scenario === "SQL debugging") {
     return "把 SQL 问题整理成可复用的排错工作流。";
   }
+  if (scenario && scenario !== "Reusable AI workflow" && scenario !== "General AI workflow") {
+    return `把零散素材整理成可复用的${scenarioLabel(scenario)}工作流。`;
+  }
   return "把捕获到的 AI 对话整理成可复用的工作流。";
 }
 
@@ -388,14 +423,20 @@ function inferUseWhen(scenario, selectedText = "") {
   if (scenario === "Interview outline generation") {
     return "当你想把零散笔记整理成更清晰的问题流程或访谈提纲时使用。";
   }
-  return `当你需要处理“${scenario}”相关任务，并希望把当前 prompt 或对话沉淀成可重复执行的方法时使用。`;
+  if (scenario && scenario !== "Reusable AI workflow" && scenario !== "General AI workflow") {
+    return `当你需要处理“${scenarioLabel(scenario)}”相关任务，并希望把当前内容沉淀成可重复执行的方法时使用。`;
+  }
+  return "当你希望把当前 prompt 或整段对话沉淀成可重复执行的方法时使用。";
 }
 
 function inferNotFor(scenario) {
   if (scenario === "Podcast interview planning" || scenario === "Interview outline generation") {
     return "不适合用在需要实时事实核查、外部检索，或直接产出成稿文章的场景。";
   }
-  return `不适合用在与“${scenario}”无关，或强依赖实时外部检索的场景。`;
+  if (scenario && scenario !== "Reusable AI workflow" && scenario !== "General AI workflow") {
+    return `不适合用在与“${scenarioLabel(scenario)}”无关，或强依赖实时外部检索的场景。`;
+  }
+  return "不适合用在强依赖实时外部检索、但当前素材本身并不足以支撑结果的场景。";
 }
 
 function inferSteps(turns, scenario, selectedText = "") {
@@ -467,6 +508,22 @@ function inferWorkflowPromptTitle(text, index, scenario) {
   const structuredLabel = deriveWorkflowPromptLabel(text, scenario);
   if (structuredLabel) {
     return structuredLabel;
+  }
+
+  if (scenario === "Social profile writing") {
+    if (index === 0) {
+      return "提炼核心身份与对外定位";
+    }
+    if (index === 1) {
+      return "整理关键经历与代表性证明";
+    }
+    if (/平台|x|linkedin|主页|名片|bio|profile/i.test(text)) {
+      return "适配目标平台的展示方式";
+    }
+    if (/语气|风格|简洁|专业|有趣|锋芒/i.test(text)) {
+      return "统一个人表达风格与语气";
+    }
+    return `补全个人简介的第 ${index + 1} 步`;
   }
 
   if (scenario === "Podcast interview planning") {
@@ -658,13 +715,20 @@ function trimWorkflowTitle(title = "") {
     return concise;
   }
 
-  return candidates[0]
+  const compressed = candidates[0]
     .replace(/和这期内容的核心方向/g, "与核心方向")
     .replace(/关键背景、/g, "")
     .replace(/、限制条件和判断标准/g, "与判断标准")
     .replace(/表达、结构和细节/g, "结构与细节")
     .replace(/一份结构清晰、可以直接使用的/g, "")
-    .slice(0, 20);
+    .replace(/可直接使用的/g, "可用")
+    .replace(/整理并输出/g, "输出")
+    .replace(/补充关键/g, "补充")
+    .trim();
+
+  const sentenceCut = compressed.split(/[，。；：]/).map((item) => item.trim()).filter(Boolean);
+  const candidate = sentenceCut.find((item) => item.length <= 20) || sentenceCut[0] || compressed;
+  return candidate.length <= 20 ? candidate : `完成第${Math.max(1, candidate.length % 9)}步关键动作`;
 }
 
 function inferPromptRequirements(scenario) {
@@ -726,7 +790,33 @@ export function createStepsFromWorkflowPrompts(workflowPrompts = [], scenario = 
   return workflowPrompts.map((item, index) => {
     const title = item?.title || `步骤 ${index + 1}`;
     const sections = parseStructuredPromptSections(item?.prompt || "");
+    const task = (sections.task || "").replace(/\s+/g, " ").trim();
     const context = (sections.context || sections.body || "").replace(/\s+/g, " ").trim();
+
+    if (task) {
+      if (/明确|确认|梳理|提炼/.test(task)) {
+        return "先明确任务目标、对象、范围和最终要交付的结果。";
+      }
+      if (/补充|提供|说明|给出/.test(task) && /背景|约束|身份|经历|限制|对象/.test(`${task} ${context}`)) {
+        return "补充关键背景、身份信息和限制条件，让后续结果更贴合实际场景。";
+      }
+      if (/优化|改写|重写|调整|强化|细化/.test(task)) {
+        return "基于已有结果继续优化表达、结构和细节，让结果更成熟可用。";
+      }
+      if (/整理|输出|生成|形成|产出/.test(task)) {
+        return "整理并输出可直接使用的最终结果，便于后续复制、展示或继续迭代。";
+      }
+    }
+
+    if (scenario === "Social profile writing") {
+      if (index === 0) {
+        return "先提炼最值得对外展示的身份定位和个人标签。";
+      }
+      if (index === workflowPrompts.length - 1) {
+        return "最后整理成可直接用于社交名片或个人主页的简介版本。";
+      }
+    }
+
     if (scenario === "Podcast interview planning") {
       if (index === 0) {
         return "先明确访谈主题、核心冲突和这期内容最想回答的问题。";
@@ -752,7 +842,7 @@ export function createStepsFromWorkflowPrompts(workflowPrompts = [], scenario = 
 
 function createStepSourcesFromWorkflowPrompts(workflowPrompts = []) {
   return workflowPrompts.map((item, index) => ({
-    step: item?.title || `步骤 ${index + 1}`,
+    step: createStepsFromWorkflowPrompts([item], "")[0] || item?.title || `步骤 ${index + 1}`,
     sourceTurnIds: Array.isArray(item?.sourceTurnIds) ? item.sourceTurnIds : [],
     sourcePreview: String(item?.prompt || "").slice(0, 220)
   }));
@@ -1005,7 +1095,7 @@ export function compileSkillDraft(payload, settings = {}) {
     ],
     steps,
     stepSources,
-    workflowPrompts,
+    workflowPrompts: built.workflowPrompts,
     promptTemplate: built.promptTemplate,
     outputFormat: built.outputFormat,
     successCriteria: inferSuccessCriteria(built.outputFormat),

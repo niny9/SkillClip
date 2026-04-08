@@ -6,6 +6,42 @@ let selectedConversationIds = new Set();
 let latestRunCheck = null;
 let selectedWorkflowPrompt = null;
 
+const SCENARIO_LABELS = {
+  "Social profile writing": "社交名片整理",
+  "Podcast interview planning": "播客访谈策划",
+  "Interview outline generation": "访谈提纲整理",
+  "Product PRD writing": "产品 PRD 撰写",
+  "Marketing copy generation": "营销文案生成",
+  "SQL debugging": "SQL 排错",
+  "Research synthesis": "研究总结",
+  "Meeting summary": "会议纪要",
+  "Writing assistant": "写作助手",
+  "Coding workflow": "代码工作流",
+  "Learning plan": "学习计划",
+  "Content repurposing": "内容二次创作",
+  "Social post generation": "社交平台内容生成",
+  "Video script writing": "视频脚本撰写",
+  "Sales outreach": "销售触达文案",
+  "Customer support reply": "客服回复",
+  "Translation refinement": "翻译润色",
+  "Prompt optimization": "提示词优化",
+  "Workflow automation": "工作流自动化",
+  "General AI workflow": "通用 AI 工作流",
+  "Reusable AI workflow": "可复用 AI 工作流"
+};
+
+const SCENARIO_CANONICAL = Object.fromEntries(
+  Object.entries(SCENARIO_LABELS).map(([key, value]) => [value, key])
+);
+
+function localizeScenario(value = "") {
+  return SCENARIO_LABELS[value] || value;
+}
+
+function canonicalizeScenario(value = "") {
+  return SCENARIO_CANONICAL[value] || value;
+}
+
 function parseWorkflowPromptSections(prompt = "") {
   const lines = String(prompt || "").split("\n");
   const sections = { body: [] };
@@ -45,7 +81,13 @@ function normalizeWorkflowPromptTitle(item, index = 0) {
   const sections = parseWorkflowPromptSections(item?.prompt || "");
   const task = String(sections.task || "").replace(/\s+/g, " ").trim();
   if (task) {
-    return task.slice(0, 20);
+    if (/明确|确认|梳理|提炼/.test(task)) return "明确目标、对象与输出";
+    if (/补充|说明|提供|给出/.test(task) && /背景|约束|身份|经历|限制|对象/.test(`${task} ${sections.context || ""}`)) {
+      return "补充背景、约束与关键信息";
+    }
+    if (/优化|改写|重写|调整|强化|细化/.test(task)) return "优化结果的结构与表达";
+    if (/整理|输出|生成|形成|产出/.test(task)) return "整理并输出最终结果";
+    return task;
   }
 
   const currentTitle = String(item?.title || "").replace(/\s+/g, " ").trim();
@@ -53,7 +95,7 @@ function normalizeWorkflowPromptTitle(item, index = 0) {
     currentTitle &&
     !/^(现在|可以|行，那|好的|然后|我想|你帮我|帮我|请你|请帮我)/.test(currentTitle)
   ) {
-    return currentTitle.slice(0, 20);
+    return currentTitle;
   }
 
   const context = String(sections.context || sections.body || "").replace(/\s+/g, " ").trim();
@@ -62,7 +104,7 @@ function normalizeWorkflowPromptTitle(item, index = 0) {
   if (/输出|整理|生成|提纲|方案|结果/.test(context)) return "整理并输出最终结果";
   if (/目标|主题|方向|范围/.test(context)) return "明确任务目标与范围";
 
-  return `第 ${index + 1} 步工作流 Prompt`;
+  return `第 ${index + 1} 步工作流`;
 }
 
 async function load() {
@@ -113,22 +155,21 @@ function renderWorkflowStatus() {
   if (!asset || selectedDetail?.kind === "conversation" || !Array.isArray(asset.workflowPrompts) || !asset.workflowPrompts.length) {
     wrapper.hidden = true;
     title.textContent = "当前还没有选中工作流步骤";
-    text.textContent = "点开某条工作流 Prompt 或步骤后，这里会显示当前对照关系。";
+    text.textContent = "点开某一步工作流后，这里会显示当前正在编辑的步骤。";
     return;
   }
 
   wrapper.hidden = false;
   if (!selectedWorkflowPrompt || !Number.isInteger(selectedWorkflowPrompt.index)) {
     title.textContent = "当前正在查看整条工作流";
-    text.textContent = `这条技能目前共有 ${asset.workflowPrompts.length} 条工作流 Prompt 和 ${asset.steps?.length || 0} 个步骤。`;
+    text.textContent = `这条技能目前共有 ${asset.workflowPrompts.length} 步工作流，默认按从上到下执行。`;
     return;
   }
 
   const index = selectedWorkflowPrompt.index;
   const prompt = asset.workflowPrompts[index];
-  const step = asset.stepSources?.[index]?.step || asset.steps?.[index] || "";
-  title.textContent = `当前选中：第 ${index + 1} 条 Prompt / 第 ${index + 1} 步`;
-  text.textContent = `${normalizeWorkflowPromptTitle(prompt, index)}${step ? ` -> ${step}` : ""}`;
+  title.textContent = `当前选中：第 ${index + 1} 步`;
+  text.textContent = normalizeWorkflowPromptTitle(prompt, index);
 }
 
 function renderRunbookPrimary(item) {
@@ -148,7 +189,7 @@ function renderRunbookPrimary(item) {
   content.innerHTML = `
     <article class="list-card workflow-runbook-card">
       <strong>完整运行手册</strong>
-      <span>这一段是最终可直接交给 AI 执行的完整技能文本。</span>
+      <span>这一段是最终可直接交给 AI 执行的完整技能内容。</span>
       <pre class="runbook-preview">${escapeHtml(item.promptTemplate)}</pre>
     </article>
   `;
@@ -331,7 +372,7 @@ function renderSkill(item, variantsForSkill = []) {
   return `
     <article class="list-card clickable-card" data-detail-kind="skill" data-detail-id="${item.id}">
       <strong>${escapeHtml(item.name)}</strong>
-      <span>可复用技能 · ${escapeHtml(item.scenario || "可复用工作流")} · 已使用 ${item.usageCount || 0} 次</span>
+      <span>可复用技能 · ${escapeHtml(localizeScenario(item.scenario || "可复用工作流"))} · 已使用 ${item.usageCount || 0} 次</span>
       <div class="meta-block">
         ${platforms ? `<small>适用平台：${escapeHtml(platforms)}</small>` : ""}
         <small>优化版本数：${variantsForSkill.length}</small>
@@ -484,16 +525,16 @@ function showDetailPanel(item, kind) {
     promptForm.elements.sourceTitle.value = item.sourceTitle || "";
     promptForm.elements.selectedText.value = displayText;
     if (sourceTitleLabel) {
-      sourceTitleLabel.textContent = isFlowCapture ? "工作流标题" : "Prompt 标题";
+      sourceTitleLabel.textContent = isFlowCapture ? "工作流标题" : "内容标题";
     }
     if (sourceContentLabel) {
-      sourceContentLabel.textContent = isFlowCapture ? "工作流内容" : "Prompt 内容";
+      sourceContentLabel.textContent = isFlowCapture ? "工作流内容" : "内容正文";
     }
     if (sourceSaveButton) {
-      sourceSaveButton.textContent = isFlowCapture ? "保存工作流原文" : "保存 Prompt";
+      sourceSaveButton.textContent = isFlowCapture ? "保存工作流原文" : "保存内容";
     }
     if (sourceOptimizeButton) {
-      sourceOptimizeButton.textContent = isFlowCapture ? "整理这段工作流" : "一键优化 Prompt";
+      sourceOptimizeButton.textContent = isFlowCapture ? "整理这段工作流" : "一键优化内容";
       sourceOptimizeButton.hidden = isFlowCapture;
     }
     if (sourceContentWrap) {
@@ -513,23 +554,23 @@ function showDetailPanel(item, kind) {
     if (note) {
       note.hidden = false;
       note.textContent = isFlowCapture
-        ? "这是你保存下来的整段工作流原文。下面优先展示系统整理出的工作流 Prompt，而不是单条 Prompt。"
+        ? "这是你保存下来的整段工作流原文。系统会优先把它整理成运行手册和工作流。"
         : "原始素材只保留来源、标题和捕获内容。结构化字段只属于技能。";
     }
     updateSupportingPanelVisibility();
     return;
   }
   if (sourceTitleLabel) {
-    sourceTitleLabel.textContent = "Prompt 标题";
+    sourceTitleLabel.textContent = "内容标题";
   }
   if (sourceContentLabel) {
-    sourceContentLabel.textContent = "Prompt 内容";
+    sourceContentLabel.textContent = "内容正文";
   }
   if (sourceSaveButton) {
-    sourceSaveButton.textContent = "保存 Prompt";
+    sourceSaveButton.textContent = "保存内容";
   }
   if (sourceOptimizeButton) {
-    sourceOptimizeButton.textContent = "一键优化 Prompt";
+    sourceOptimizeButton.textContent = "一键优化内容";
     sourceOptimizeButton.hidden = false;
   }
   if (sourceContentWrap) {
@@ -538,7 +579,7 @@ function showDetailPanel(item, kind) {
   form.elements.id.value = item.id || "";
   form.elements.kind.value = kind;
   form.elements.name.value = item.name || "";
-  form.elements.scenario.value = item.scenario || item.scenarioOverride || "";
+  form.elements.scenario.value = localizeScenario(item.scenario || item.scenarioOverride || "");
   form.elements.useWhen.value = item.useWhen || "";
   form.elements.notFor.value = item.notFor || "";
   form.elements.goal.value = item.goal || item.changeSummary || "";
@@ -683,8 +724,8 @@ function renderOptimizedPrompt(item) {
   panel.hidden = false;
   content.innerHTML = `
     <article class="list-card">
-      <strong>${escapeHtml(item.optimizedTitle || "优化后的 Prompt")}</strong>
-      ${item.inferredScenario ? `<span>${escapeHtml(item.inferredScenario)}</span>` : ""}
+      <strong>${escapeHtml(item.optimizedTitle || "优化后的内容")}</strong>
+      ${item.inferredScenario ? `<span>${escapeHtml(localizeScenario(item.inferredScenario))}</span>` : ""}
       <div class="meta-block">
         <small>${escapeHtml(item.optimizedPrompt)}</small>
       </div>
@@ -728,11 +769,11 @@ function renderWorkflowPromptEditor(item, index, promptCheck = null) {
   checkNode.innerHTML = promptCheck
     ? `
       <article class="list-card ${promptCheck.running ? "status-running" : ""}">
-        <strong>${escapeHtml(promptCheck.running ? "正在检查这条工作流 Prompt..." : promptCheck.ok ? "这条工作流 Prompt 可以使用" : "这条工作流 Prompt 还需要继续优化")}</strong>
+        <strong>${escapeHtml(promptCheck.running ? "正在检查这一步工作流..." : promptCheck.ok ? "这一步工作流可以使用" : "这一步工作流还需要继续优化")}</strong>
         <span>${escapeHtml(promptCheck.summary || "")}</span>
         ${(Array.isArray(promptCheck.issues) && promptCheck.issues.length)
           ? `<div class="meta-block"><small>${escapeHtml(promptCheck.issues.join(" | "))}</small></div>`
-          : "<p class='muted'>当前没有额外的 Prompt 级问题。</p>"}
+          : "<p class='muted'>当前没有额外问题。</p>"}
       </article>
     `
     : `
@@ -744,7 +785,7 @@ function renderWorkflowPromptEditor(item, index, promptCheck = null) {
       </div>
       ${(item.previousPrompt || item.previousTitle)
         ? `<details class="raw-json-wrap"><summary>上一版本</summary><div class="meta-block"><small>${escapeHtml(item.previousTitle || "")}</small><small>${escapeHtml(item.previousPrompt || "")}</small></div></details>`
-        : "<p class='muted'>你可以在这里编辑单条工作流 Prompt，然后保存、优化或单独检查。</p>"}
+        : "<p class='muted'>这里优先编辑工作流本身。改完后，运行手册会自动跟着更新。</p>"}
     `;
   renderWorkflowStatus();
 }
@@ -769,17 +810,17 @@ function renderRunCheckPreview(result) {
   const promptChecks = Array.isArray(result.promptChecks) && result.promptChecks.length
     ? `
       <div class="meta-block">
-        <small>工作流 Prompt 检查结果</small>
+        <small>工作流检查结果</small>
       </div>
       ${result.promptChecks.map((item, index) => `
         <article class="list-card">
-          <strong>第 ${index + 1} 条 · ${escapeHtml(normalizeWorkflowPromptTitle(item, index))}</strong>
+          <strong>第 ${index + 1} 步 · ${escapeHtml(normalizeWorkflowPromptTitle(item, index))}</strong>
           <span>${escapeHtml(item.ok ? "可用" : "还需要继续优化")}</span>
           <div class="meta-block">
             <small>${escapeHtml(item.summary || "")}</small>
             ${(Array.isArray(item.issues) && item.issues.length)
               ? `<small>${escapeHtml(item.issues.join(" | "))}</small>`
-              : "<small>这条 Prompt 当前没有额外问题。</small>"}
+              : "<small>这一步当前没有额外问题。</small>"}
           </div>
         </article>
       `).join("")}
@@ -805,7 +846,23 @@ function renderStepMapPreview(stepSources, fallbackItems = []) {
     return;
   }
 
-  if (!Array.isArray(stepSources) || stepSources.length === 0) {
+  const currentAsset = getCurrentDetailAsset();
+  const workflowPrompts = currentAsset?.workflowPrompts || [];
+  const normalizedStepSources = Array.isArray(stepSources) && stepSources.length >= workflowPrompts.length
+    ? stepSources
+    : workflowPrompts.map((prompt, index) => ({
+      step: `第 ${index + 1} 步：${normalizeWorkflowPromptTitle(prompt, index)}`,
+      sourceTurnIds: prompt?.sourceTurnIds || [],
+      sourcePreview: String(prompt?.prompt || "").slice(0, 220)
+    }));
+
+  if ((!Array.isArray(normalizedStepSources) || normalizedStepSources.length === 0) && (!Array.isArray(fallbackItems) || fallbackItems.length === 0)) {
+    panel.hidden = true;
+    content.innerHTML = "";
+    return;
+  }
+
+  if (!Array.isArray(normalizedStepSources) || normalizedStepSources.length === 0) {
     if (!Array.isArray(fallbackItems) || fallbackItems.length === 0) {
       panel.hidden = true;
       content.innerHTML = "";
@@ -824,13 +881,10 @@ function renderStepMapPreview(stepSources, fallbackItems = []) {
   }
 
   panel.hidden = false;
-  const currentAsset = getCurrentDetailAsset();
-  const workflowPrompts = currentAsset?.workflowPrompts || [];
-  content.innerHTML = stepSources.map((item, index) => `
+  content.innerHTML = normalizedStepSources.map((item, index) => `
     <article class="list-card workflow-step-card ${selectedWorkflowPrompt?.index === index ? "linked-focus-card" : ""}" data-step-index="${index}">
       <strong>第 ${index + 1} 步</strong>
       <span>${escapeHtml(item.step || "")}</span>
-      ${workflowPrompts[index] ? `<div class="meta-block"><small>对应工作流 Prompt</small><small>${escapeHtml(normalizeWorkflowPromptTitle(workflowPrompts[index], index))}</small></div>` : ""}
       <div class="action-row">
         ${item.sourceTurnIds?.length ? item.sourceTurnIds.map((turnId) => `<button type="button" data-action="jump-to-turn" data-turn-id="${escapeHtml(turnId)}">定位到 ${escapeHtml(turnId)}</button>`).join("") : ""}
       </div>
@@ -877,25 +931,18 @@ function renderWorkflowAlignment() {
   }
 
   const prompts = asset.workflowPrompts || [];
-  const steps = asset.stepSources || [];
   panel.hidden = false;
   content.innerHTML = prompts.map((prompt, index) => `
     <article class="list-card workflow-alignment-row ${selectedWorkflowPrompt?.index === index ? "linked-focus-card" : ""}">
-      <div class="workflow-alignment-col">
-        <strong>第 ${index + 1} 步 Prompt</strong>
+      <div class="workflow-alignment-col workflow-alignment-col-single">
+        <strong>第 ${index + 1} 步</strong>
         <span>${escapeHtml(normalizeWorkflowPromptTitle(prompt, index))}</span>
         <div class="meta-block">
           <small>${escapeHtml(prompt.prompt || "")}</small>
         </div>
         <div class="action-row">
           <button type="button" data-action="edit-workflow-prompt" data-index="${index}">编辑</button>
-        </div>
-      </div>
-      <div class="workflow-alignment-col">
-        <strong>第 ${index + 1} 步说明</strong>
-        <span>${escapeHtml(steps[index]?.step || asset.steps?.[index] || "还没有这一步的说明")}</span>
-        <div class="meta-block">
-          <small>${escapeHtml(steps[index]?.sourcePreview || "这一步还没有来源摘要。")}</small>
+          ${prompt.sourceTurnIds?.length ? prompt.sourceTurnIds.map((turnId) => `<button type="button" data-action="jump-to-turn" data-turn-id="${escapeHtml(turnId)}">定位到 ${escapeHtml(turnId)}</button>`).join("") : ""}
         </div>
       </div>
     </article>
@@ -967,16 +1014,42 @@ function renderValidationPreview(validation) {
     return;
   }
 
+  const modeMap = {
+    local: "本地规则",
+    api: "模型复核"
+  };
+  const statusMap = {
+    strong: "通过",
+    needs_review: "需要复查",
+    weak: "偏弱",
+    pending_setup: "待配置"
+  };
+  const translateIssue = (issue) => {
+    const map = {
+      "API validation mode is configured but not fully enabled yet.": "你已经打开模型复核，但当前 API 配置还没有完整生效。",
+      "Local heuristic validation is still recommended as the fallback.": "在模型复核可用之前，当前会继续使用本地规则作为兜底。",
+      "Name is too short.": "名称太短，不足以表达这条技能的作用。",
+      "Use When is missing or too vague.": "适用场景缺失，或写得太模糊。",
+      "Run prompt is short. Review whether the steps are detailed enough.": "运行手册偏短，建议检查步骤是否足够完整。",
+      "Skill should have at least 2 clear steps.": "这条技能至少应有 2 个清晰步骤。",
+      "Output format is missing.": "输出格式缺失。",
+      "Success criteria should contain at least 2 checks.": "成功标准至少要有 2 条。",
+      "No source conversation is linked.": "没有关联原始来源对话。",
+      "No inputs were extracted. Review manually.": "还没有识别出输入变量，建议手动检查。"
+    };
+    return map[issue] || issue;
+  };
+
   panel.hidden = false;
   const issues = validation.issues?.length
-    ? validation.issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join("")
+    ? validation.issues.map((issue) => `<li>${escapeHtml(translateIssue(issue))}</li>`).join("")
     : "<li>当前没有明显问题。</li>";
 
   content.innerHTML = `
     <div class="validation-card status-${escapeHtml(validation.status || "unknown")}">
       <div class="validation-topline">
         <div class="status-pill status-${escapeHtml(validation.status || "unknown")}">
-          ${escapeHtml(validation.mode || "local")} · ${escapeHtml(validation.status || "unknown")}
+          ${escapeHtml(modeMap[validation.mode] || validation.mode || "本地规则")} · ${escapeHtml(statusMap[validation.status] || validation.status || "未知状态")}
         </div>
         ${validation.score != null ? `<strong class="validation-score">${escapeHtml(String(validation.score))}</strong>` : ""}
       </div>
@@ -1011,14 +1084,10 @@ function renderVariantCompare(item, kind) {
   content.innerHTML = `
     <article class="list-card">
       <strong>${escapeHtml(baseSkill.name || "基础技能")}</strong>
-      <span>${escapeHtml(baseSkill.scenario || "暂未填写场景")}</span>
+      <span>${escapeHtml(localizeScenario(baseSkill.scenario || "暂未填写场景"))}</span>
       <div class="meta-block">
-        <small>基础模板</small>
-        <small>${escapeHtml((baseSkill.promptTemplate || "").slice(0, 220) || "暂时还没有运行手册")}</small>
-      </div>
-      <div class="meta-block">
-        <small>当前优化重点</small>
-        <small>${escapeHtml(item.changeSummary || "暂时还没有填写优化重点。")}</small>
+        <small>基础版本运行手册摘要</small>
+        <small>${escapeHtml((baseSkill.promptTemplate || "").slice(0, 180) || "暂时还没有运行手册")}</small>
       </div>
     </article>
   `;
@@ -1080,7 +1149,7 @@ function renderSourceCard(source) {
         ${turnsPreview ? `<div class="source-turns"><small>对话时间线</small>${turnsPreview}</div>` : ""}
       </details>
       <div class="action-row">
-        <button type="button" data-action="re-save-source-prompt" data-source-id="${source.id}">另存为 Prompt</button>
+        <button type="button" data-action="re-save-source-prompt" data-source-id="${source.id}">另存为单条内容</button>
         <button type="button" data-action="recompile-source-skill" data-source-id="${source.id}">重新编译为草稿</button>
       </div>
     </article>
@@ -1170,7 +1239,7 @@ document.addEventListener("click", async (event) => {
 
   if (action === "compile-selected") {
     if (selectedConversationIds.size === 0) {
-      setFeedback("请先选择至少一条 Prompt。");
+      setFeedback("请先选择至少一条内容。");
       return;
     }
 
@@ -1182,7 +1251,7 @@ document.addEventListener("click", async (event) => {
     await load();
     if (draft) {
       showDetailPanel(draft, "draft");
-      setFeedback("已把选中的 Prompt 合并成一条技能草稿。");
+      setFeedback("已把选中的内容合并成一条技能草稿。");
     }
     return;
   }
@@ -1253,12 +1322,12 @@ document.addEventListener("click", async (event) => {
     const index = Number(target.dataset.index);
     const prompt = asset?.workflowPrompts?.[index];
     if (!prompt) {
-      setFeedback("没有找到这条工作流 Prompt。");
+      setFeedback("没有找到这一步工作流。");
       return;
     }
     focusWorkflowIndex(index);
     renderWorkflowPromptEditor(prompt, index);
-    setFeedback("已打开这条工作流 Prompt，准备编辑。");
+    setFeedback("已打开这一步工作流，准备编辑。");
     return;
   }
 
@@ -1272,7 +1341,7 @@ document.addEventListener("click", async (event) => {
   if (action === "focus-workflow-prompt") {
     const index = Number(target.dataset.index);
     focusWorkflowIndex(index);
-    setFeedback(`已定位到第 ${index + 1} 条工作流 Prompt。`);
+    setFeedback(`已定位到第 ${index + 1} 步工作流。`);
     return;
   }
 
@@ -1284,21 +1353,21 @@ document.addEventListener("click", async (event) => {
     const asset = getCurrentDetailAsset();
     const index = Number(target.dataset.index ?? selectedWorkflowPrompt?.index);
     if (!Number.isInteger(index) || index < 0) {
-      setFeedback("请先选择一条工作流 Prompt。");
+      setFeedback("请先选择一步工作流。");
       return;
     }
     const prompt = asset?.workflowPrompts?.[index];
     if (!prompt) {
-      setFeedback("没有找到这条工作流 Prompt。");
+      setFeedback("没有找到这一步工作流。");
       return;
     }
     renderWorkflowPromptEditor(prompt, index, {
       ok: false,
       running: true,
-      summary: "系统正在调用模型检查这条 Prompt，请稍等。",
+      summary: "系统正在调用模型检查这一步工作流，请稍等。",
       issues: []
     });
-    setFeedback(`正在检查第 ${index + 1} 条工作流 Prompt...`);
+    setFeedback(`正在检查第 ${index + 1} 步工作流...`);
     const response = await chrome.runtime.sendMessage({
       type: MESSAGE_TYPES.RUN_WORKFLOW_PROMPT_CHECK,
       payload: { id: selectedDetail.id, index }
@@ -1306,7 +1375,7 @@ document.addEventListener("click", async (event) => {
     const latestAsset = getCurrentDetailAsset();
     const latestPrompt = latestAsset?.workflowPrompts?.[index] || prompt;
     renderWorkflowPromptEditor(latestPrompt, index, response?.result || null);
-    setFeedback(`第 ${index + 1} 条工作流 Prompt 检查已完成。`);
+    setFeedback(`第 ${index + 1} 步工作流检查已完成。`);
     return;
   }
 
@@ -1317,22 +1386,22 @@ document.addEventListener("click", async (event) => {
     }
     const index = Number(selectedWorkflowPrompt?.index);
     if (!Number.isInteger(index) || index < 0) {
-      setFeedback("请先选择一条工作流 Prompt。");
+      setFeedback("请先选择一步工作流。");
       return;
     }
     const asset = getCurrentDetailAsset();
     const prompt = asset?.workflowPrompts?.[index];
     if (!prompt) {
-      setFeedback("没有找到这条工作流 Prompt。");
+      setFeedback("没有找到这一步工作流。");
       return;
     }
     renderWorkflowPromptEditor(prompt, index, {
       ok: false,
       running: true,
-      summary: "系统正在优化这条工作流 Prompt，请稍等。",
+      summary: "系统正在优化这一步工作流，请稍等。",
       issues: []
     });
-    setFeedback(`正在优化第 ${index + 1} 条工作流 Prompt...`);
+      setFeedback(`正在优化第 ${index + 1} 步工作流...`);
     const response = await chrome.runtime.sendMessage({
       type: MESSAGE_TYPES.OPTIMIZE_WORKFLOW_PROMPT,
       payload: { id: selectedDetail.id, kind: selectedDetail.kind, index }
@@ -1347,11 +1416,11 @@ document.addEventListener("click", async (event) => {
       focusWorkflowIndex(index);
       renderWorkflowPromptEditor(nextPrompt, index, {
         ok: true,
-        summary: "这条工作流 Prompt 已优化完成。",
+        summary: "这一步工作流已优化完成。",
         issues: []
       });
     }
-    setFeedback(`第 ${index + 1} 条工作流 Prompt 已优化完成。`);
+      setFeedback(`第 ${index + 1} 步工作流已优化完成。`);
     return;
   }
 
@@ -1362,22 +1431,22 @@ document.addEventListener("click", async (event) => {
     }
     const index = Number(target.dataset.index);
     if (!Number.isInteger(index) || index < 0) {
-      setFeedback("没有找到这条工作流 Prompt。");
+      setFeedback("没有找到这一步工作流。");
       return;
     }
     const asset = getCurrentDetailAsset();
     const prompt = asset?.workflowPrompts?.[index];
     if (!prompt) {
-      setFeedback("没有找到这条工作流 Prompt。");
+      setFeedback("没有找到这一步工作流。");
       return;
     }
     renderWorkflowPromptEditor(prompt, index, {
       ok: false,
       running: true,
-      summary: "系统正在优化这条工作流 Prompt，请稍等。",
+      summary: "系统正在优化这一步工作流，请稍等。",
       issues: []
     });
-    setFeedback(`正在优化第 ${index + 1} 条工作流 Prompt...`);
+    setFeedback(`正在优化第 ${index + 1} 步工作流...`);
     const response = await chrome.runtime.sendMessage({
       type: MESSAGE_TYPES.OPTIMIZE_WORKFLOW_PROMPT,
       payload: { id: selectedDetail.id, kind: selectedDetail.kind, index }
@@ -1392,11 +1461,11 @@ document.addEventListener("click", async (event) => {
       focusWorkflowIndex(index);
       renderWorkflowPromptEditor(nextPrompt, index, response?.result ? {
         ok: true,
-        summary: "这条工作流 Prompt 已优化完成。",
+        summary: "这一步工作流已优化完成。",
         issues: []
       } : null);
     }
-    setFeedback(`第 ${index + 1} 条工作流 Prompt 已优化完成。`);
+    setFeedback(`第 ${index + 1} 步工作流已优化完成。`);
     return;
   }
 
@@ -1413,11 +1482,11 @@ document.addEventListener("click", async (event) => {
       showDetailPanel({
         ...item,
         scenario: item.scenarioOverride || "",
-        useWhen: "",
-        notFor: "",
+        useWhen: item.useWhen || "",
+        notFor: item.notFor || "",
         goal: item.changeSummary || "",
-        outputFormat: "",
-        successCriteria: [],
+        outputFormat: item.outputFormat || "",
+        successCriteria: item.successCriteria || [],
         steps: item.steps || []
       }, "variant");
     }
@@ -1464,7 +1533,7 @@ document.addEventListener("click", async (event) => {
         type: MESSAGE_TYPES.SAVE_PROMPT,
         payload: buildPayloadFromConversation(source)
       });
-      setFeedback("已把来源内容另存为 Prompt。");
+      setFeedback("已把来源内容另存为单条内容。");
     }
     return;
   }
@@ -1493,7 +1562,7 @@ document.addEventListener("click", async (event) => {
     });
     if (response?.result) {
       renderOptimizedPrompt(response.result);
-      setFeedback("这条 Prompt 已优化完成。");
+      setFeedback("这条内容已优化完成。");
       await load();
     }
     return;
@@ -1569,11 +1638,11 @@ document.addEventListener("click", async (event) => {
       showDetailPanel({
         ...item,
         scenario: item.scenarioOverride || "",
-        useWhen: "",
-        notFor: "",
+        useWhen: item.useWhen || "",
+        notFor: item.notFor || "",
         goal: item.changeSummary || "",
-        outputFormat: "",
-        successCriteria: [],
+        outputFormat: item.outputFormat || "",
+        successCriteria: item.successCriteria || [],
         steps: item.steps || []
       }, "variant");
     }
@@ -1600,20 +1669,21 @@ document.querySelector("[data-detail-form]")?.addEventListener("submit", async (
   event.preventDefault();
   const form = event.currentTarget;
   const formData = new FormData(form);
+  const currentAsset = getCurrentDetailAsset();
   const payload = {
     id: String(formData.get("id") || ""),
     name: String(formData.get("name") || ""),
-    scenario: String(formData.get("scenario") || ""),
+    scenario: canonicalizeScenario(String(formData.get("scenario") || "")),
     useWhen: String(formData.get("useWhen") || ""),
     notFor: String(formData.get("notFor") || ""),
     goal: String(formData.get("goal") || ""),
-    promptTemplate: selectedDetail?.promptTemplate || "",
+    promptTemplate: currentAsset?.promptTemplate || "",
     outputFormat: String(formData.get("outputFormat") || ""),
     successCriteria: String(formData.get("successCriteria") || "")
       .split("\n")
       .map((item) => item.trim())
       .filter(Boolean),
-    steps: selectedDetail?.steps || []
+    steps: currentAsset?.steps || []
   };
   const kind = String(formData.get("kind") || "");
 
@@ -1645,7 +1715,7 @@ document.querySelector("[data-prompt-form]")?.addEventListener("submit", async (
       selectedText: String(formData.get("selectedText") || "")
     }
   });
-  setFeedback("Prompt 已保存。");
+  setFeedback("内容已保存。");
 });
 
 document.querySelector("[data-workflow-prompt-form]")?.addEventListener("submit", async (event) => {
@@ -1677,7 +1747,7 @@ document.querySelector("[data-workflow-prompt-form]")?.addEventListener("submit"
   if (prompt) {
     renderWorkflowPromptEditor(prompt, index);
   }
-  setFeedback("工作流 Prompt 已保存。");
+  setFeedback("工作流已保存。");
 });
 
 load();
