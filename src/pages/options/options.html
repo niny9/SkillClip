@@ -10,7 +10,7 @@
     <main class="page-shell page-shell-dashboard">
       <section class="hero-card">
         <div>
-          <p class="eyebrow">控制中心 Control Center</p>
+          <p class="eyebrow">控制中心</p>
           <h1>SkillClip 设置与调试</h1>
           <p class="lede">
             用这个页面查看当前状态、本地资产、模型设置，以及公开发布前的准备情况。
@@ -66,10 +66,10 @@
           <details class="guide-wrap">
             <summary>调试说明</summary>
             <div class="checklist">
-              <p>1. If buttons do nothing, refresh the AI page after reloading the extension.</p>
-              <p>2. If capture is empty, make sure the page is one of the supported AI domains.</p>
-              <p>3. If voice fails, check Chrome speech permissions and browser support.</p>
-              <p>4. Open the service worker console from `chrome://extensions` for runtime errors.</p>
+              <p>1. 如果按钮没有反应，先重新加载扩展，再刷新 AI 页面。</p>
+              <p>2. 如果没有抓到内容，先确认当前页面属于支持的平台。</p>
+              <p>3. 如果语音失败，检查 Chrome 的麦克风权限和浏览器支持情况。</p>
+              <p>4. 如果扩展报错，可在 `chrome://extensions` 里打开 Service Worker 查看运行错误。</p>
             </div>
           </details>
         </article>
@@ -78,7 +78,7 @@
       <section class="card">
         <h2>本地资产</h2>
         <p class="muted">
-          先按资产分类查看内容。只有在备份或调试时，才需要看 JSON。
+          先按资产分类查看内容。只有在备份或调试时，才需要看 JSON 原始数据。
         </p>
         <div class="asset-filter-row">
           <label class="field-label compact-field">
@@ -112,7 +112,7 @@
         <div class="asset-browser" data-asset-browser></div>
         <p class="muted" data-asset-feedback>点击任意资产卡片，就只查看这一条的 JSON。</p>
         <details class="raw-json-wrap">
-          <summary>Raw JSON / 原始数据</summary>
+          <summary>原始 JSON 数据</summary>
           <textarea data-json-output class="code-area" spellcheck="false"></textarea>
         </details>
       </section>
@@ -172,11 +172,11 @@
         <details class="guide-wrap">
           <summary>上线步骤</summary>
           <div class="checklist">
-            <p>1. Add final icons and screenshots.</p>
-            <p>2. Publish a public privacy policy page.</p>
-            <p>3. Test each supported AI site in Chrome.</p>
-            <p>4. Zip the extension root for release packaging.</p>
-            <p>5. Submit to Chrome Web Store with the privacy disclosures.</p>
+            <p>1. 补最终图标和截图。</p>
+            <p>2. 发布公开可访问的隐私政策页面。</p>
+            <p>3. 在 Chrome 里逐个测试支持的平台。</p>
+            <p>4. 打包扩展根目录，生成发布压缩包。</p>
+            <p>5. 按隐私披露要求提交到 Chrome Web Store。</p>
           </div>
         </details>
       </section>

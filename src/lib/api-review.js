@@ -1,4 +1,4 @@
-import { createStepsFromWorkflowPrompts } from "./compiler.js";
+import { createStepsFromWorkflowPrompts, selectMeaningfulWorkflowTurns } from "./compiler.js";
 import { nowIso } from "./utils.js";
 
 export async function extractSkillDraftWithApi(payload, fallbackDraft, settings) {
@@ -251,13 +251,7 @@ export async function optimizeWorkflowTurnsWithApi(payload, settings) {
     return [];
   }
 
-  const userTurns = (payload.turns || [])
-    .filter((turn) => turn?.role === "user" && turn?.text)
-    .slice(0, 8)
-    .map((turn, index) => ({
-      id: turn.id || `turn_${index + 1}`,
-      text: turn.text
-    }));
+  const userTurns = selectMeaningfulWorkflowTurns(payload.turns || [], 10);
 
   if (!userTurns.length) {
     return [];
@@ -280,10 +274,16 @@ export async function optimizeWorkflowTurnsWithApi(payload, settings) {
             "You convert a multi-turn AI conversation into reusable workflow prompts.",
             "Return strict JSON with one key: workflowPrompts.",
             "workflowPrompts must be an array of { title, prompt, sourceTurnIds }.",
-            "Create one workflow prompt for each meaningful user turn, in order.",
-            "Each prompt must be optimized, concise, and reusable.",
-            "Do not copy the raw chat wording unless necessary.",
-            "Each prompt should use a strong structure suitable for repeated use.",
+            "Create one workflow prompt for each meaningful workflow step, in order.",
+            "Only keep actionable content: task goal, constraints, inputs, step-specific context, output requirements, and revision instructions that actually change the result.",
+            "Do not keep chat filler, acknowledgements, emotional reactions, thinking markers, status text, or assistant meta commentary.",
+            "Explicitly remove text such as 'Thought for 1 second', '思考', '让我想想', or similar internal reasoning markers.",
+            "Do not copy the raw chat wording unless it is already a precise reusable instruction.",
+            "If several nearby user turns belong to the same step, merge them into one workflow prompt.",
+            "Each workflow prompt must be optimized, concise, directly reusable, and suitable for copy-paste execution.",
+            "Use complete Chinese action titles within 20 Chinese characters whenever possible. Never use truncated raw dialogue as the title.",
+            "Treat the workflow as one whole skill. Put shared role, shared mission, and shared output format only in the first workflow prompt when needed.",
+            "Later workflow prompts should only keep the step-specific action, extra context, and local requirements.",
             "Write the prompts in Simplified Chinese unless the source clearly requires another language."
           ].join(" ")
         },

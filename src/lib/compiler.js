@@ -108,6 +108,124 @@ function mergeInputs(...groups) {
   return Array.from(byKey.values());
 }
 
+const WORKFLOW_NOISE_PATTERNS = [
+  /^thought for \d+\s*second/i,
+  /^thought for \d+\s*seconds/i,
+  /^已深度思考/i,
+  /^深度思考/i,
+  /^思考中/i,
+  /^思考了?\d+/i,
+  /^让我想想/i,
+  /^我来想想/i,
+  /^下面是我的思考/i,
+  /^我先想一下/i,
+  /^我需要先思考/i,
+  /^we need to/i,
+  /^let me think/i
+];
+
+const WORKFLOW_FOLLOWUP_PREFIX = /^(可以|好的|好|行|那|那你|那我们|然后|接着|继续|所以|另外|还有|OK|ok|okay|嗯|呃)\s*[，,。:\-]?\s*/;
+
+const WORKFLOW_ACTION_KEYWORDS = [
+  "生成", "整理", "总结", "提炼", "优化", "改写", "重写", "输出", "补充", "说明", "明确",
+  "设计", "撰写", "形成", "梳理", "归纳", "拆解", "转换", "包装", "改成", "保留",
+  "不要", "需要", "必须", "适合", "用于", "直接", "可复制", "可粘贴", "约束", "格式",
+  "结构", "语气", "风格", "平台", "对象", "目标", "要求", "问题", "提纲", "简介", "名片",
+  "PRD", "文案", "脚本", "访谈", "播客", "清单", "简历", "自我介绍"
+];
+
+function stripWorkflowNoise(text = "") {
+  const lines = String(text || "")
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !WORKFLOW_NOISE_PATTERNS.some((pattern) => pattern.test(line)))
+    .filter((line) => !/^[-*]\s*thought for \d+/i.test(line))
+    .filter((line) => !/^[-*]\s*思考/i.test(line));
+
+  return lines.join("\n").trim();
+}
+
+function normalizeWorkflowClause(text = "") {
+  let value = stripWorkflowNoise(text)
+    .replace(/^user:\s*/i, "")
+    .replace(/^assistant:\s*/i, "")
+    .replace(/^system:\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  while (WORKFLOW_FOLLOWUP_PREFIX.test(value)) {
+    value = value.replace(WORKFLOW_FOLLOWUP_PREFIX, "").trim();
+  }
+
+  value = value
+    .replace(/^如果可以的话[，,]?\s*/i, "")
+    .replace(/^帮我\s*/i, "")
+    .replace(/^请你\s*/i, "")
+    .replace(/^请\s*/i, "")
+    .trim();
+
+  return value;
+}
+
+function isMeaningfulWorkflowText(text = "") {
+  const normalized = normalizeWorkflowClause(text);
+  if (!normalized) {
+    return false;
+  }
+
+  if (normalized.length >= 18) {
+    return true;
+  }
+
+  return WORKFLOW_ACTION_KEYWORDS.some((keyword) => normalized.includes(keyword));
+}
+
+function mergeAdjacentWorkflowTurns(turns = []) {
+  const result = [];
+
+  turns.forEach((turn) => {
+    const text = normalizeWorkflowClause(turn?.text || "");
+    if (!isMeaningfulWorkflowText(text)) {
+      return;
+    }
+
+    const previous = result[result.length - 1];
+    const shouldMerge =
+      previous &&
+      (
+        text.length <= 24 ||
+        /不要|直接|改成|换成|补充|加上|保留|删掉|格式|语气|风格|结构|更/.test(text)
+      );
+
+    if (shouldMerge) {
+      previous.text = `${previous.text}\n${text}`.trim();
+      previous.sourceTurnIds = dedupe([...(previous.sourceTurnIds || []), turn.id].filter(Boolean));
+      return;
+    }
+
+    result.push({
+      id: turn.id,
+      text,
+      sourceTurnIds: [turn.id].filter(Boolean)
+    });
+  });
+
+  return result;
+}
+
+export function selectMeaningfulWorkflowTurns(turns = [], limit = 10) {
+  const userTurns = (turns || [])
+    .filter((turn) => turn?.role === "user" && turn?.text)
+    .map((turn, index) => ({
+      id: turn.id || `turn_${index + 1}`,
+      text: turn.text
+    }));
+
+  const merged = mergeAdjacentWorkflowTurns(userTurns);
+  return merged.slice(0, limit);
+}
+
 function inferSkillName(payload, scenario) {
   const firstUserTurn = (payload.turns || []).find((turn) => turn.role === "user" && turn.text)?.text || "";
   const raw = payload.selectedText || firstUserTurn || payload.title || "";
@@ -217,6 +335,63 @@ function parseStructuredPromptSections(prompt = "") {
   };
 }
 
+function joinUniqueLines(...groups) {
+  const seen = new Set();
+  const result = [];
+
+  groups
+    .flat()
+    .filter(Boolean)
+    .forEach((block) => {
+      String(block)
+        .split("\n")
+        .map((line) => line.replace(/^-+\s*/, "").trim())
+        .filter(Boolean)
+        .forEach((line) => {
+          if (seen.has(line)) {
+            return;
+          }
+          seen.add(line);
+          result.push(line);
+        });
+    });
+
+  return result;
+}
+
+function buildWorkflowPromptFromSections({
+  role = "",
+  task = "",
+  context = "",
+  requirements = "",
+  output = "",
+  includeSharedFrame = false
+}) {
+  return [
+    includeSharedFrame
+      ? [
+        "# 全局角色",
+        role,
+        "",
+        "# 总体任务",
+        task,
+        "",
+        "# 统一输出要求",
+        output,
+        ""
+      ].join("\n")
+      : "",
+    "# 本步动作",
+    task || "完成当前这一步",
+    "",
+    "# 本步上下文",
+    context,
+    "",
+    "# 本步要求",
+    joinUniqueLines(requirements).map((item) => `- ${item}`).join("\n")
+  ].filter(Boolean).join("\n");
+}
+
 function compactWorkflowPromptForRunbook(item, index, previous = null) {
   const sections = parseStructuredPromptSections(item?.prompt || "");
   const previousSections = previous ? parseStructuredPromptSections(previous.prompt || "") : null;
@@ -249,6 +424,18 @@ function compactWorkflowPromptForRunbook(item, index, previous = null) {
   }
 
   return lines.join("\n");
+}
+
+function workflowActionBucket(text = "") {
+  const normalized = normalizeWorkflowClause(text);
+  if (/角色|身份|扮演|假设你是|作为/.test(normalized)) return "role";
+  if (/目标|范围|对象|定位|方向|要解决|主题/.test(normalized)) return "goal";
+  if (/背景|约束|限制|补充|信息|经历|对象|身份|平台/.test(normalized)) return "context";
+  if (/不要\s*markdown|纯文本|直接复制|直接粘贴|格式|输出格式/.test(normalized)) return "format";
+  if (/优化|改写|重写|调整|细化|润色|增强/.test(normalized)) return "refine";
+  if (/整理|生成|输出|形成|写出|给我一版|产出/.test(normalized)) return "deliver";
+  if (/检查|验证|review|check/.test(normalized)) return "check";
+  return "other";
 }
 
 function deriveWorkflowPromptLabel(text = "", scenario = "") {
@@ -480,27 +667,29 @@ function inferSteps(turns, scenario, selectedText = "") {
 }
 
 function inferWorkflowPrompts(turns = [], scenario = "", selectedText = "") {
-  const userTurns = turns.filter((turn) => turn.role === "user" && turn.text).slice(0, 6);
-  if (!userTurns.length && selectedText) {
+  const workflowTurns = selectMeaningfulWorkflowTurns(turns, 10);
+  const cleanedSelectedText = normalizeWorkflowClause(selectedText);
+
+  if (!workflowTurns.length && cleanedSelectedText) {
     return [{
-      title: inferWorkflowPromptTitle(selectedText, 0, scenario),
-      prompt: optimizePromptText(selectedText, scenario, {
+      title: inferWorkflowPromptTitle(cleanedSelectedText, 0, scenario),
+      prompt: optimizePromptText(cleanedSelectedText, scenario, {
         workflow: true,
         includeSharedFrame: true,
-        focusTitle: inferWorkflowPromptTitle(selectedText, 0, scenario)
+        focusTitle: inferWorkflowPromptTitle(cleanedSelectedText, 0, scenario)
       }),
       sourceTurnIds: []
     }];
   }
 
-  return userTurns.map((turn, index) => ({
+  return workflowTurns.map((turn, index) => ({
     title: inferWorkflowPromptTitle(turn.text, index, scenario),
     prompt: optimizePromptText(turn.text, scenario, {
       workflow: true,
       includeSharedFrame: index === 0,
       focusTitle: inferWorkflowPromptTitle(turn.text, index, scenario)
     }),
-    sourceTurnIds: turn.id ? [turn.id] : []
+    sourceTurnIds: turn.sourceTurnIds || (turn.id ? [turn.id] : [])
   }));
 }
 
@@ -563,9 +752,7 @@ function inferWorkflowPromptTitle(text, index, scenario) {
 }
 
 function optimizePromptText(text, scenario, options = {}) {
-  const clean = String(text || "")
-    .replace(/\s+/g, " ")
-    .trim();
+  const clean = normalizeWorkflowClause(text);
 
   if (!clean) {
     return "";
@@ -662,12 +849,21 @@ function inferPromptTask(scenario) {
 }
 
 function inferWorkflowActionTitle(text = "", scenario = "", index = 0) {
-  const normalized = String(text || "").replace(/\s+/g, " ").trim();
+  const normalized = normalizeWorkflowClause(text);
 
   if (!normalized) {
     return `继续完成这条工作流的第 ${index + 1} 步`;
   }
 
+  if (/假设你是|你现在是|请你扮演|扮演|作为一个|作为一名/.test(normalized)) {
+    return "设定角色、任务边界与输出身份";
+  }
+  if (/不要\s*markdown|不要markdown|直接复制|直接粘贴|纯文本|不要格式/.test(normalized)) {
+    return "约束最终输出格式，确保结果可直接使用";
+  }
+  if (/面试官|提问|追问|问题/.test(normalized)) {
+    return "切换提问视角并完善问题设计";
+  }
   if (/先|首先/.test(normalized)) {
     return "明确任务目标、范围与预期输出";
   }
@@ -902,7 +1098,7 @@ function scoreWorkflowPrompt(item, scenario = "") {
 }
 
 function enrichWorkflowPrompts(workflowPrompts = [], scenario = "") {
-  const deduped = dedupeWorkflowPrompts(workflowPrompts).map((item, index) => ({
+  const deduped = compressWorkflowPrompts(dedupeWorkflowPrompts(workflowPrompts), scenario).map((item, index) => ({
     ...item,
     order: index + 1,
     quality: scoreWorkflowPrompt(item, scenario)
@@ -933,6 +1129,64 @@ function dedupeWorkflowPrompts(items = []) {
       ...item,
       prompt
     });
+  });
+
+  return result;
+}
+
+function compressWorkflowPrompts(items = [], scenario = "") {
+  if (!Array.isArray(items) || items.length <= 1) {
+    return items;
+  }
+
+  const result = [];
+
+  items.forEach((item, index) => {
+    const current = {
+      ...item,
+      prompt: String(item?.prompt || "").trim(),
+      sourceTurnIds: Array.isArray(item?.sourceTurnIds) ? item.sourceTurnIds : []
+    };
+
+    const previous = result[result.length - 1];
+    if (!previous) {
+      result.push(current);
+      return;
+    }
+
+    const currentSections = parseStructuredPromptSections(current.prompt);
+    const previousSections = parseStructuredPromptSections(previous.prompt);
+    const currentBucket = workflowActionBucket(currentSections.task || current.title || current.prompt);
+    const previousBucket = workflowActionBucket(previousSections.task || previous.title || previous.prompt);
+    const shouldMerge =
+      currentBucket === previousBucket &&
+      currentBucket !== "deliver" &&
+      currentBucket !== "check";
+
+    if (!shouldMerge) {
+      result.push(current);
+      return;
+    }
+
+    const mergedTask = currentBucket === "goal"
+      ? "明确任务目标、对象与输出要求"
+      : currentBucket === "context"
+        ? "补充关键背景、约束与必要信息"
+        : currentBucket === "format"
+          ? "统一输出格式，确保结果可直接使用"
+          : currentBucket === "refine"
+            ? "优化现有结果的结构、表达与细节"
+            : previousSections.task || currentSections.task || previous.title || current.title;
+
+    previous.prompt = buildWorkflowPromptFromSections({
+      role: previousSections.role || currentSections.role || inferPromptRole(scenario),
+      task: mergedTask,
+      context: joinUniqueLines(previousSections.context, currentSections.context, previousSections.body, currentSections.body).join("\n"),
+      requirements: joinUniqueLines(previousSections.requirements, currentSections.requirements),
+      output: previousSections.output || currentSections.output || inferPromptOutputFormat(scenario),
+      includeSharedFrame: /^# 全局角色/m.test(previous.prompt)
+    });
+    previous.sourceTurnIds = dedupe([...(previous.sourceTurnIds || []), ...(current.sourceTurnIds || [])]);
   });
 
   return result;
@@ -1117,10 +1371,8 @@ export function compileSkillDraft(payload, settings = {}) {
 }
 
 function summarizeTurnsForDraft(turns = []) {
-  const relevantTurns = turns
-    .filter((turn) => turn?.text)
-    .slice(0, 6)
-    .map((turn) => `${turn.role || "unknown"}: ${turn.text}`);
+  const relevantTurns = selectMeaningfulWorkflowTurns(turns, 8)
+    .map((turn) => `user: ${turn.text}`);
   return relevantTurns.join("\n\n").slice(0, 2400);
 }
 

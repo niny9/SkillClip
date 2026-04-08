@@ -155,14 +155,14 @@ function renderWorkflowStatus() {
   if (!asset || selectedDetail?.kind === "conversation" || !Array.isArray(asset.workflowPrompts) || !asset.workflowPrompts.length) {
     wrapper.hidden = true;
     title.textContent = "当前还没有选中工作流步骤";
-    text.textContent = "点开某一步工作流后，这里会显示当前正在编辑的步骤。";
+    text.textContent = "点开任意一步后，这里会显示当前正在编辑的内容。";
     return;
   }
 
   wrapper.hidden = false;
   if (!selectedWorkflowPrompt || !Number.isInteger(selectedWorkflowPrompt.index)) {
     title.textContent = "当前正在查看整条工作流";
-    text.textContent = `这条技能目前共有 ${asset.workflowPrompts.length} 步工作流，默认按从上到下执行。`;
+    text.textContent = `这条技能目前共有 ${asset.workflowPrompts.length} 步，默认按从上到下执行。`;
     return;
   }
 
@@ -256,7 +256,7 @@ async function applySkillToActiveTab(skill) {
 function renderList(selector, items, renderer) {
   const container = document.querySelector(selector);
   if (!items.length) {
-    container.innerHTML = "<p class='muted'>这里还没有内容。</p>";
+    container.innerHTML = "<p class='muted empty-state'>这里还没有内容。</p>";
     return;
   }
 
@@ -266,7 +266,7 @@ function renderList(selector, items, renderer) {
 function renderSkills(selector, skills, variants) {
   const container = document.querySelector(selector);
   if (!skills.length) {
-    container.innerHTML = "<p class='muted'>还没有可复用技能。</p>";
+    container.innerHTML = "<p class='muted empty-state'>还没有可复用技能。</p>";
     return;
   }
 
@@ -283,7 +283,7 @@ function renderSkills(selector, skills, variants) {
 function renderVariants(selector, variants, skills) {
   const container = document.querySelector(selector);
   if (!variants.length) {
-    container.innerHTML = "<p class='muted'>还没有同场景优化版本。</p>";
+    container.innerHTML = "<p class='muted empty-state'>还没有同场景优化版本。</p>";
     return;
   }
 
@@ -346,15 +346,15 @@ function renderConversation(item) {
         <span>选择</span>
       </label>
       <span class="queue-badge ${pending ? "queue-badge-pending" : ""} ${failed ? "queue-badge-failed" : ""}">${badgeText}</span>
-      <span>来源：${escapeHtml(item.sourcePlatform || "other")} · 保存方式：${escapeHtml(item.captureMode)}</span>
+      <span>来源：${escapeHtml(item.sourcePlatform || "other")}</span>
       <div class="meta-block">
         <small>${hasAutoDraft
-          ? `已自动整理：${escapeHtml(linkedDraft.status === "draft" ? "可编辑草稿" : "自动建议")}`
+          ? `整理状态：${escapeHtml(linkedDraft.status === "draft" ? "可继续编辑" : "已生成建议")}`
           : pending
-            ? "系统正在整理这条素材，请稍等。"
+            ? "系统正在整理这条素材。"
             : failed
-              ? "这条素材自动整理失败了，你可以手动重新生成。"
-              : "这条素材还没有整理出技能建议。"
+              ? "这条素材整理失败了，可以手动重新生成。"
+              : "这条素材还没有整理建议。"
         }</small>
         <small>${escapeHtml(summaryText)}</small>
       </div>
@@ -372,11 +372,10 @@ function renderSkill(item, variantsForSkill = []) {
   return `
     <article class="list-card clickable-card" data-detail-kind="skill" data-detail-id="${item.id}">
       <strong>${escapeHtml(item.name)}</strong>
-      <span>可复用技能 · ${escapeHtml(localizeScenario(item.scenario || "可复用工作流"))} · 已使用 ${item.usageCount || 0} 次</span>
+      <span>${escapeHtml(localizeScenario(item.scenario || "可复用工作流"))} · 可直接复用</span>
       <div class="meta-block">
-        ${platforms ? `<small>适用平台：${escapeHtml(platforms)}</small>` : ""}
-        <small>优化版本数：${variantsForSkill.length}</small>
-        ${variantsForSkill.length ? variantsForSkill.map((variant) => `<small>${escapeHtml(variant.name)}</small>`).join("") : "<small>还没有优化版本。</small>"}
+        <small>${escapeHtml(item.useWhen || item.goal || "这条技能已经可以直接复用。").slice(0, 72)}</small>
+        <small>已使用 ${item.usageCount || 0} 次 · 优化版本 ${variantsForSkill.length} 个${platforms ? ` · ${escapeHtml(platforms)}` : ""}</small>
       </div>
       <div class="action-row">
         <button type="button" data-action="edit-skill" data-id="${item.id}">编辑</button>
@@ -393,10 +392,10 @@ function renderVariant(item, baseSkill) {
   return `
     <article class="list-card clickable-card" data-detail-kind="variant" data-detail-id="${item.id}">
       <strong>${escapeHtml(item.name)}</strong>
-      <span>同场景优化版本 · 所属技能：${escapeHtml(baseSkill?.name || item.baseSkillId)}</span>
+      <span>基于 ${escapeHtml(baseSkill?.name || item.baseSkillId)} 的优化版本</span>
       <div class="meta-block">
-        ${platforms ? `<small>适用平台：${escapeHtml(platforms)}</small>` : ""}
-        <small>${escapeHtml(item.changeSummary || "还没有填写优化重点。")}</small>
+        <small>${escapeHtml(item.changeSummary || "这一版用于继续优化工作流结果。")}</small>
+        ${platforms ? `<small>${escapeHtml(platforms)}</small>` : ""}
       </div>
       <div class="action-row">
         <button type="button" data-action="edit-variant" data-id="${item.id}">编辑</button>

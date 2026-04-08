@@ -217,6 +217,11 @@ p {
 
 .meta-block small {
   color: var(--muted);
+  line-height: 1.45;
+}
+
+.empty-state {
+  padding: 0.6rem 0.2rem;
 }
 
 .detail-fold {

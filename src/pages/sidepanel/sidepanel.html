@@ -9,19 +9,9 @@
   <body>
     <main class="page-shell page-shell-workspace">
       <section>
-        <p class="eyebrow">工作台 Workspace</p>
+        <p class="eyebrow">工作台</p>
         <h1>工作台</h1>
-        <p class="lede">保存单条内容或整段工作流后，会先进入待整理区。整理完成后，你可以把它升级成可复用技能；优化版用于同场景下的第二版、第三版。</p>
-
-        <section class="card">
-          <h2>当前流程</h2>
-          <div class="checklist">
-            <p>1. 原始素材：你刚保存下来的原文或对话。</p>
-            <p>2. 可复用技能：原始素材会自动整理，你可以直接编辑，或直接升级成正式技能。</p>
-            <p>3. 同场景优化版本：你自己从正式技能分出的第二版、第三版。</p>
-            <p>4. 已归档：不再常用，但仍保留在本地资产里。</p>
-          </div>
-        </section>
+        <p class="lede">先保存内容，再整理成可复用技能。运行手册是主结果，工作流用于按步骤检查和优化。</p>
 
         <section class="card">
           <h2>快捷操作</h2>
@@ -34,10 +24,7 @@
           <p class="muted" data-feedback>
             打开一个 AI 页面后，再用这些按钮触发页面内工具。
           </p>
-          <div class="checklist">
-            <p>`打开操作条`：在 AI 页面打开操作条，你可以保存单条内容、保存整段对话、语音输入、编译为技能。</p>
-            <p>`打开技能面板`：在 AI 输入框里打开技能插入面板，用来复用已经保存好的正式技能。</p>
-          </div>
+          <p class="muted">操作条用于保存内容，技能面板用于把已保存技能插回当前输入框。</p>
         </section>
 
         <section class="card">
@@ -58,7 +45,7 @@
 
         <section class="card">
           <h2>同场景优化版本</h2>
-          <p class="muted">这里放的是你手动为同一 skill 分出来的另一版，用于比较和优化。</p>
+          <p class="muted">这里放的是你手动从同一技能分出来的另一版，用于比较和优化。</p>
           <div data-variants class="stack"></div>
         </section>
 
@@ -110,7 +97,7 @@
           <input type="hidden" name="kind" />
 
           <details class="detail-source-block detail-fold" data-detail-meta-panel>
-            <summary>技能基础信息（可展开）</summary>
+            <summary>基础信息（可展开）</summary>
             <label class="field-label">
               <span>名称</span>
               <input name="name" type="text" />
